@@ -1,0 +1,7 @@
+node_modules/
+.env
+build/
+dist/
+uploads/
+frontend/build/
+backend/uploads/
