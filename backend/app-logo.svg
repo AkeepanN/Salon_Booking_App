@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Salon Booking">
-  <rect width="96" height="96" rx="22" fill="#0f766e"/>
-  <path d="M25 64h46" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <path d="M31 64V38l17-14 17 14v26" fill="none" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
-  <path d="M40 64V49h16v15" fill="#ffffff"/>
-  <circle cx="32" cy="28" r="5" fill="#facc15"/>
-</svg>
