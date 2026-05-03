@@ -9,8 +9,9 @@ import {
   YAxis
 } from "recharts";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:4000/api";
-const API_ORIGIN = API_BASE.replace(/\/api\/?$/, "");
+const API_BASE_URL = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_BASE = `${API_BASE_URL}/api`;
+const API_ORIGIN = API_BASE_URL;
 const now = new Date();
 const today = now.toISOString().slice(0, 10);
 const currentMonth = now.getMonth() + 1;
