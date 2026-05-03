@@ -1,6 +1,8 @@
 const express = require('express');
 const Booking = require('../models/Booking');
 const Rating = require('../models/Rating');
+const Product = require('../models/Product');
+const ProductOrder = require('../models/ProductOrder');
 const Salon = require('../models/Salon');
 const Service = require('../models/Service');
 const Setting = require('../models/Setting');
@@ -281,6 +283,60 @@ router.get('/salons', async (req, res, next) => {
         rating_count: rating?.rating_count || 0,
       };
     }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/products', async (req, res, next) => {
+  try {
+    const products = await Product.find()
+      .populate('barber_id', 'name phone')
+      .populate('salon_id', 'name address phone')
+      .sort({ createdAt: -1 });
+
+    res.json(products);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/products/:id', async (req, res, next) => {
+  try {
+    const updates = {};
+
+    if (req.body.active !== undefined) {
+      updates.active = req.body.active === true;
+    }
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    )
+      .populate('barber_id', 'name phone')
+      .populate('salon_id', 'name address phone');
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/product-orders', async (req, res, next) => {
+  try {
+    const orders = await ProductOrder.find()
+      .populate('customer_id', 'name phone')
+      .populate('barber_id', 'name phone')
+      .populate('salon_id', 'name address phone')
+      .populate('product_id', 'name price image category active')
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
   } catch (error) {
     next(error);
   }

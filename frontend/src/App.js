@@ -127,6 +127,8 @@ function Icon({ name }) {
     earnings: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6",
     logout: "M10 17l5-5-5-5M15 12H3M21 4v16",
     deactivate: "M12 9v4M12 17h.01M10.3 4.3 2.9-1.7 8 14A2 2 0 0 1 19.5 20h-15a2 2 0 0 1-1.7-3.1l7.5-12.6Z",
+    products: "M7 4h10l2 4v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8l2-4Zm2 4V6h6v2",
+    shop: "M6 6h15l-1.5 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.6L5.4 4H3M9 20a1 1 0 1 0 0 .01M18 20a1 1 0 1 0 0 .01",
   };
 
   return (
@@ -292,6 +294,21 @@ function App() {
   const [boardPhotoPreview, setBoardPhotoPreview] = useState("");
   const [boardPhotoMessage, setBoardPhotoMessage] = useState("");
   const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "30" });
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    stock_quantity: "",
+    category: "",
+    salon_id: "",
+    active: true
+  });
+  const [productImageFile, setProductImageFile] = useState(null);
+  const [productImagePreview, setProductImagePreview] = useState("");
+  const [editingProductId, setEditingProductId] = useState("");
+  const [barberProducts, setBarberProducts] = useState([]);
+  const [barberProductOrders, setBarberProductOrders] = useState([]);
+  const [barberProductMessage, setBarberProductMessage] = useState("");
   const [reserveForm, setReserveForm] = useState({
     date: today,
     start_time: "12:00",
@@ -303,6 +320,10 @@ function App() {
   const [customerTab, setCustomerTab] = useState("book");
   const [customerBookings, setCustomerBookings] = useState([]);
   const [customerBookingTab, setCustomerBookingTab] = useState("confirmed");
+  const [customerProducts, setCustomerProducts] = useState([]);
+  const [customerProductOrders, setCustomerProductOrders] = useState([]);
+  const [productOrderQuantities, setProductOrderQuantities] = useState({});
+  const [shopMessage, setShopMessage] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [ratingModalBooking, setRatingModalBooking] = useState(null);
   const [ratingForm, setRatingForm] = useState({ rating: 5, comment: "" });
@@ -321,6 +342,8 @@ function App() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminSalons, setAdminSalons] = useState([]);
   const [adminBookings, setAdminBookings] = useState([]);
+  const [adminProducts, setAdminProducts] = useState([]);
+  const [adminProductOrders, setAdminProductOrders] = useState([]);
   const [adminFilters, setAdminFilters] = useState({ date: "", salon_id: "", status: "confirmed" });
   const [adminSummaryRange, setAdminSummaryRange] = useState("this_month");
   const [adminBusinessSummary, setAdminBusinessSummary] = useState(null);
@@ -426,11 +449,14 @@ function App() {
     }
     if (isLoggedIn && role === "customer") {
       loadSalons();
+      loadProducts();
       loadPaymentRules();
       handlePaymentReturn();
     }
     if (isLoggedIn && role === "barber") {
       loadMySalons();
+      loadBarberProducts();
+      loadBarberProductOrders();
     }
     if (isLoggedIn && role === "admin") {
       loadAdminDashboard();
@@ -582,11 +608,13 @@ function App() {
     setBoardPhotoMessage("");
     setWorkingHoursMessage("");
     setReserveMessage("");
+    setBarberProductMessage("");
   };
 
   const clearBarberFeedback = () => {
     setBarberNotice(null);
     setBarberConfirm(null);
+    setBarberProductMessage("");
   };
 
   const authHeaders = () => ({
@@ -1011,6 +1039,13 @@ function App() {
     setBarberBookingTab("confirmed");
     setBarberMenuOpen(false);
     setBarberModal("");
+    setBarberProducts([]);
+    setBarberProductOrders([]);
+    setBarberProductMessage("");
+    setProductForm({ name: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
+    setProductImageFile(null);
+    setProductImagePreview("");
+    setEditingProductId("");
     setReservedSlots([]);
     setBarberNotice(null);
     setBarberConfirm(null);
@@ -1019,6 +1054,10 @@ function App() {
     setCustomerTab("book");
     setCustomerBookings([]);
     setCustomerBookingTab("confirmed");
+    setCustomerProducts([]);
+    setCustomerProductOrders([]);
+    setProductOrderQuantities({});
+    setShopMessage("");
     setCustomerMenuOpen(false);
     setRatingModalBooking(null);
     setRatingMessage("");
@@ -1028,6 +1067,8 @@ function App() {
     setAdminUsers([]);
     setAdminSalons([]);
     setAdminBookings([]);
+    setAdminProducts([]);
+    setAdminProductOrders([]);
     setBookingFeeForm("0");
     setCancellationChargeForm("0");
     setCommissionForm("0");
@@ -1070,6 +1111,22 @@ function App() {
       setMessage("Could not connect to the server");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/products`);
+      const data = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        setShopMessage(data.message || "Could not load products");
+        return;
+      }
+
+      setCustomerProducts(data);
+    } catch (error) {
+      setShopMessage("Could not connect to the server");
     }
   };
 
@@ -1311,6 +1368,67 @@ function App() {
     }
   };
 
+  const loadCustomerProductOrders = async () => {
+    setLoading(true);
+    setShopMessage("");
+
+    try {
+      const res = await fetch(`${API_BASE}/product-orders/my`, {
+        headers: authHeaders()
+      });
+      const data = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        setShopMessage(data.message || "Could not load product orders");
+        return;
+      }
+
+      setCustomerProductOrders(data);
+    } catch (error) {
+      setShopMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const placeProductOrder = async (product) => {
+    const quantity = Number(productOrderQuantities[product._id] || 1);
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setShopMessage("Quantity must be at least 1");
+      return;
+    }
+
+    setLoading(true);
+    setShopMessage("");
+
+    try {
+      const res = await fetch(`${API_BASE}/product-orders`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          product_id: product._id,
+          quantity
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setShopMessage(data.message || "Could not place product order");
+        return;
+      }
+
+      setShopMessage("Product order placed");
+      setProductOrderQuantities((current) => ({ ...current, [product._id]: 1 }));
+      await loadProducts();
+      await loadCustomerProductOrders();
+    } catch (error) {
+      setShopMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isFutureConfirmedBooking = (booking) => {
     if (booking.status !== "confirmed") {
       return false;
@@ -1505,6 +1623,8 @@ function App() {
 
       await loadBarberAllBookings();
       await loadBarberInsights();
+      await loadBarberProducts();
+      await loadBarberProductOrders();
     } catch (error) {
       setMessage("Could not connect to the server");
     } finally {
@@ -1521,6 +1641,7 @@ function App() {
     setBoardPhotoFile(null);
     setBoardPhotoPreview("");
     setBoardPhotoMessage("");
+    setProductForm((current) => ({ ...current, salon_id: salonId || "" }));
 
     if (salon) {
       setSalonForm({
@@ -1558,6 +1679,7 @@ function App() {
     setBoardPhotoPreview("");
     setBoardPhotoMessage("");
     setServiceForm({ name: "", price: "", duration: "30" });
+    setProductForm({ name: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
     setReserveForm({ date: today, start_time: "12:00", end_time: "12:30", reason: "" });
     setReserveMessage("");
     setWorkingHoursMessage("");
@@ -1570,6 +1692,50 @@ function App() {
     setCopyFromSalonId("");
     setMessage("");
     clearBarberFeedback();
+  };
+
+  const handleProductImageChange = (event) => {
+    const file = event.target.files?.[0];
+    setBarberProductMessage("");
+
+    if (!file) {
+      setProductImageFile(null);
+      setProductImagePreview("");
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setProductImageFile(null);
+      setProductImagePreview("");
+      setBarberProductMessage("Only jpg, jpeg, png, and webp images are allowed");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProductImageFile(null);
+      setProductImagePreview("");
+      setBarberProductMessage("Image must be 5MB or smaller");
+      return;
+    }
+
+    setProductImageFile(file);
+    setProductImagePreview(URL.createObjectURL(file));
+  };
+
+  const resetProductForm = () => {
+    setProductForm({
+      name: "",
+      description: "",
+      price: "",
+      stock_quantity: "",
+      category: "",
+      salon_id: selectedBarberSalonId || "",
+      active: true
+    });
+    setProductImageFile(null);
+    setProductImagePreview("");
+    setEditingProductId("");
   };
 
   const handleBoardPhotoChange = (event) => {
@@ -1849,6 +2015,180 @@ function App() {
     setBarberServices(data);
   };
 
+  const loadBarberProducts = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/products/mine`, {
+        headers: authHeaders()
+      });
+      const data = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not load products");
+        return;
+      }
+
+      setBarberProducts(data);
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    }
+  };
+
+  const loadBarberProductOrders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/product-orders/barber`, {
+        headers: authHeaders()
+      });
+      const data = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not load product orders");
+        return;
+      }
+
+      setBarberProductOrders(data);
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    }
+  };
+
+  const saveProduct = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setBarberProductMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("name", productForm.name.trim());
+      formData.append("description", productForm.description.trim());
+      formData.append("price", productForm.price);
+      formData.append("stock_quantity", productForm.stock_quantity);
+      formData.append("category", productForm.category.trim());
+      if (productForm.salon_id) {
+        formData.append("salon_id", productForm.salon_id);
+      }
+      formData.append("active", String(productForm.active));
+      if (productImageFile) {
+        formData.append("image", productImageFile);
+      }
+
+      const res = await fetch(
+        editingProductId ? `${API_BASE}/products/${editingProductId}` : `${API_BASE}/products`,
+        {
+          method: editingProductId ? "PATCH" : "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not save product");
+        return;
+      }
+
+      setBarberProductMessage("Saved successfully");
+      resetProductForm();
+      await loadBarberProducts();
+      await loadProducts();
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditProduct = (product) => {
+    setEditingProductId(product._id);
+    setProductForm({
+      name: product.name || "",
+      description: product.description || "",
+      price: product.price ?? "",
+      stock_quantity: product.stock_quantity ?? "",
+      category: product.category || "",
+      salon_id: product.salon_id?._id || product.salon_id || "",
+      active: product.active !== false
+    });
+    setProductImageFile(null);
+    setProductImagePreview(product.image ? imageUrl(product.image) : "");
+    setBarberProductMessage("");
+  };
+
+  const requestDeleteProduct = (product) => {
+    setBarberConfirm({
+      action: "deleteProduct",
+      payload: product,
+      title: `Deactivate ${product.name}?`,
+      body: "Customers will no longer be able to order this product.",
+      confirmLabel: "Yes, deactivate product"
+    });
+  };
+
+  const deleteProduct = async (product) => {
+    setLoading(true);
+    setBarberProductMessage("");
+
+    try {
+      const res = await fetch(`${API_BASE}/products/${product._id}`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not deactivate product");
+        return;
+      }
+
+      setBarberConfirm(null);
+      setBarberProductMessage(data.message || "Saved successfully");
+      if (editingProductId === product._id) {
+        resetProductForm();
+      }
+      await loadBarberProducts();
+      await loadProducts();
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateBarberProductOrder = async (orderId, status, paymentStatus) => {
+    setLoading(true);
+    setBarberProductMessage("");
+
+    try {
+      const body = {};
+      if (status) {
+        body.status = status;
+      }
+      if (paymentStatus) {
+        body.payment_status = paymentStatus;
+      }
+
+      const res = await fetch(`${API_BASE}/product-orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not update product order");
+        return;
+      }
+
+      setBarberProductMessage("Saved successfully");
+      await loadBarberProductOrders();
+      await loadBarberProducts();
+      await loadProducts();
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addService = async (event) => {
     event.preventDefault();
 
@@ -2066,6 +2406,11 @@ function App() {
 
     if (barberConfirm.action === "deleteService") {
       await deleteService(barberConfirm.payload);
+      return;
+    }
+
+    if (barberConfirm.action === "deleteProduct") {
+      await deleteProduct(barberConfirm.payload);
       return;
     }
 
@@ -2306,6 +2651,30 @@ function App() {
     setAdminSalons(data);
   };
 
+  const loadAdminProducts = async () => {
+    const res = await fetch(`${API_BASE}/admin/products`, { headers: authHeaders() });
+    const data = await res.json().catch(() => []);
+
+    if (!res.ok) {
+      setAdminMessage(data.message || "Could not load products");
+      return;
+    }
+
+    setAdminProducts(data);
+  };
+
+  const loadAdminProductOrders = async () => {
+    const res = await fetch(`${API_BASE}/admin/product-orders`, { headers: authHeaders() });
+    const data = await res.json().catch(() => []);
+
+    if (!res.ok) {
+      setAdminMessage(data.message || "Could not load product orders");
+      return;
+    }
+
+    setAdminProductOrders(data);
+  };
+
   const loadAdminBookings = async (filters = adminFilters) => {
     const params = new URLSearchParams();
 
@@ -2399,11 +2768,42 @@ function App() {
     setAdminMessage("");
 
     try {
-      await Promise.all([loadAdminUsers(), loadAdminSalons(), loadAdminBookings(), loadBookingFeeSetting(), loadAdminBusinessSummary(), loadAdminEarnings()]);
+      await Promise.all([
+        loadAdminUsers(),
+        loadAdminSalons(),
+        loadAdminBookings(),
+        loadAdminProducts(),
+        loadAdminProductOrders(),
+        loadBookingFeeSetting(),
+        loadAdminBusinessSummary(),
+        loadAdminEarnings()
+      ]);
     } catch (error) {
       setAdminMessage("Could not connect to the server");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleAdminProduct = async (product, active) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/products/${product._id}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ active })
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setAdminMessage(data.message || "Could not update product");
+        return;
+      }
+
+      setAdminMessage(active ? "Product reactivated" : "Product deactivated");
+      await loadAdminProducts();
+      await loadProducts();
+    } catch (error) {
+      setAdminMessage("Could not connect to the server");
     }
   };
 
@@ -2812,6 +3212,7 @@ function App() {
               ["earnings", "Earnings"],
               ["users", "Users"],
               ["salons", "Salons"],
+              ["products", "Products"],
               ["bookings", "Bookings"]
             ].map(([tab, label]) => (
               <button
@@ -2819,7 +3220,21 @@ function App() {
                 onClick={() => setAdminTab(tab)}
                 style={{ ...styles.sidebarButton, ...(adminTab === tab ? styles.activeSidebarButton : {}) }}
               >
-                <Icon name={tab === "settings" ? "payments" : tab === "earnings" ? "earnings" : tab === "salons" ? "salons" : tab === "bookings" ? "bookings" : "admin"} />
+                <Icon
+                  name={
+                    tab === "settings"
+                      ? "payments"
+                      : tab === "earnings"
+                        ? "earnings"
+                        : tab === "salons"
+                          ? "salons"
+                          : tab === "products"
+                            ? "products"
+                            : tab === "bookings"
+                              ? "bookings"
+                              : "admin"
+                  }
+                />
                 {label}
               </button>
             ))}
@@ -3225,6 +3640,68 @@ function App() {
               </>
             )}
 
+            {adminTab === "products" && (
+              <>
+                <div style={styles.sectionHeader}>
+                  <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Products Overview</h2>
+                  <button onClick={() => { loadAdminProducts(); loadAdminProductOrders(); }} style={styles.smallButton}>Refresh</button>
+                </div>
+
+                <div style={styles.list}>
+                  {adminProducts.length === 0 ? (
+                    <p style={styles.message}>No products yet</p>
+                  ) : adminProducts.map((product) => (
+                    <div key={product._id} style={styles.listItem}>
+                      {product.image ? (
+                        <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
+                      ) : (
+                        <div style={styles.salonPhotoPlaceholder}>Product image</div>
+                      )}
+                      <strong>{product.name}</strong>
+                      <span>{product.category || "General"}</span>
+                      <span>Rs. {product.price}</span>
+                      <span>Stock: {product.stock_quantity}</span>
+                      <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Unknown"}</span>
+                      <span>Salon: {product.salon_id?.name || "Not linked to a salon"}</span>
+                      <span>Status: {product.active === false ? "Inactive" : "Active"}</span>
+                      <div style={styles.buttonRow}>
+                        <button
+                          type="button"
+                          onClick={() => toggleAdminProduct(product, product.active === false)}
+                          style={product.active === false ? styles.smallButton : styles.dangerButton}
+                        >
+                          {product.active === false ? "Reactivate" : "Deactivate"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={styles.sectionHeader}>
+                  <h3 style={styles.compactTitle}>Product Orders</h3>
+                </div>
+                <div style={styles.list}>
+                  {adminProductOrders.length === 0 ? (
+                    <p style={styles.message}>No product orders yet</p>
+                  ) : adminProductOrders.map((order) => (
+                    <div key={order._id} style={styles.listItem}>
+                      <strong>{order.product_id?.name || "Product"}</strong>
+                      <span>Customer: {order.customer_id?.name || order.customer_id?.phone || "Customer"}</span>
+                      <span>Barber: {order.barber_id?.name || order.barber_id?.phone || "Barber"}</span>
+                      <span>Salon: {order.salon_id?.name || "Not linked"}</span>
+                      <span>Quantity: {order.quantity}</span>
+                      <span>Total: Rs. {order.total_amount}</span>
+                      <span>Created: {formatDateTime(order.createdAt)}</span>
+                      <div style={styles.buttonRow}>
+                        <StatusBadge status={order.status} />
+                        <StatusBadge status={order.payment_status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             {adminTab === "bookings" && (
               <>
                 <div style={styles.sectionHeader}>
@@ -3388,6 +3865,18 @@ function App() {
                 <button type="button" onClick={() => openBarberModal("profile")} style={styles.menuItem}>Profile</button>
                 <button type="button" onClick={() => openBarberModal("salons")} style={styles.menuItem}>Manage salons</button>
                 <button type="button" onClick={() => openBarberModal("service")} style={styles.menuItem}>Add service</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBarberMenuOpen(false);
+                    setBarberMainTab("products");
+                    loadBarberProducts();
+                    loadBarberProductOrders();
+                  }}
+                  style={styles.menuItem}
+                >
+                  Products
+                </button>
                 <button type="button" onClick={() => openBarberModal("hours")} style={styles.menuItem}>Working hours</button>
                 <button type="button" onClick={() => openBarberModal("reserve")} style={styles.menuItem}>Reserve time slot</button>
                 <button type="button" onClick={() => openBarberModal("photo")} style={styles.menuItem}>Add/update salon board photo</button>
@@ -3455,6 +3944,18 @@ function App() {
           >
             <Icon name="bookings" />
             Bookings
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setBarberMainTab("products");
+              loadBarberProducts();
+              loadBarberProductOrders();
+            }}
+            style={{ ...styles.tabButton, ...(barberMainTab === "products" ? styles.activeTab : {}) }}
+          >
+            <Icon name="products" />
+            Products
           </button>
         </div>
 
@@ -3644,6 +4145,147 @@ function App() {
                   <strong>{service.name}</strong>
                   <span>Rs. {service.price} | {service.duration} min</span>
                   <span>{service.active === false ? "Inactive" : "Active"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        )}
+
+        {barberMainTab === "products" && (
+        <section style={styles.panel}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Products</h2>
+            <button
+              type="button"
+              onClick={() => {
+                resetProductForm();
+                loadBarberProducts();
+                loadBarberProductOrders();
+              }}
+              style={styles.smallButton}
+            >
+              Refresh
+            </button>
+          </div>
+
+          {barberProductMessage && (
+            <p style={barberProductMessage === "Saved successfully" ? styles.successNotice : styles.message}>
+              {barberProductMessage}
+            </p>
+          )}
+
+          <form onSubmit={saveProduct} style={styles.uploadBox}>
+            <h3 style={styles.compactTitle}>{editingProductId ? "Edit product" : "Add product"}</h3>
+            <label style={styles.label}>Product name</label>
+            <input value={productForm.name} onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Description</label>
+            <textarea value={productForm.description} onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))} style={styles.input} rows={3} />
+            <label style={styles.label}>Price</label>
+            <input type="number" min="0" step="0.01" value={productForm.price} onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Stock quantity</label>
+            <input type="number" min="0" step="1" value={productForm.stock_quantity} onChange={(event) => setProductForm((current) => ({ ...current, stock_quantity: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Category</label>
+            <input value={productForm.category} onChange={(event) => setProductForm((current) => ({ ...current, category: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Salon optional</label>
+            <select value={productForm.salon_id} onChange={(event) => setProductForm((current) => ({ ...current, salon_id: event.target.value }))} style={styles.input}>
+              <option value="">Not linked to a salon</option>
+              {barberSalons.map((salon) => (
+                <option key={salon._id} value={salon._id}>{salon.name}</option>
+              ))}
+            </select>
+            <label style={styles.label}>Product image</label>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProductImageChange} style={styles.input} />
+            {productImagePreview ? (
+              <img src={productImagePreview} alt="" style={styles.boardPhotoPreview} />
+            ) : (
+              <div style={styles.boardPhotoPlaceholder}>Product image preview</div>
+            )}
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={productForm.active}
+                onChange={(event) => setProductForm((current) => ({ ...current, active: event.target.checked }))}
+              />
+              Active
+            </label>
+            <div style={styles.buttonRow}>
+              <button type="submit" disabled={loading} style={styles.primaryButton}>
+                {editingProductId ? "Update product" : "Add product"}
+              </button>
+              {editingProductId && (
+                <button type="button" onClick={resetProductForm} style={styles.smallButton}>
+                  Cancel edit
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div style={styles.sectionHeader}>
+            <h3 style={styles.compactTitle}>My products</h3>
+          </div>
+          {barberProducts.length === 0 ? (
+            <p style={styles.message}>No products yet</p>
+          ) : (
+            <div style={styles.list}>
+              {barberProducts.map((product) => (
+                <div key={product._id} style={styles.listItem}>
+                  {product.image ? (
+                    <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
+                  ) : (
+                    <div style={styles.salonPhotoPlaceholder}>Product image</div>
+                  )}
+                  <strong>{product.name}</strong>
+                  <span>{product.category || "General"}</span>
+                  <span>Rs. {product.price}</span>
+                  <span>Stock: {product.stock_quantity}</span>
+                  <span>Salon: {product.salon_id?.name || "Not linked to a salon"}</span>
+                  <span>{product.active === false ? "Inactive" : "Active"}</span>
+                  <div style={styles.buttonRow}>
+                    <button type="button" onClick={() => startEditProduct(product)} style={styles.smallButton}>Edit</button>
+                    <button type="button" onClick={() => requestDeleteProduct(product)} style={styles.dangerButton}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={styles.sectionHeader}>
+            <h3 style={styles.compactTitle}>Product orders</h3>
+          </div>
+          {barberProductOrders.length === 0 ? (
+            <p style={styles.message}>No product orders yet</p>
+          ) : (
+            <div style={styles.list}>
+              {barberProductOrders.map((order) => (
+                <div key={order._id} style={styles.listItem}>
+                  <strong>{order.product_id?.name || "Product"}</strong>
+                  <span>Customer: {order.customer_id?.name || order.customer_id?.phone || "Customer"}</span>
+                  <span>Quantity: {order.quantity}</span>
+                  <span>Total: Rs. {order.total_amount}</span>
+                  <span>Salon: {order.salon_id?.name || "Not linked"}</span>
+                  <span>Created: {formatDateTime(order.createdAt)}</span>
+                  <div style={styles.buttonRow}>
+                    <StatusBadge status={order.status} />
+                    <StatusBadge status={order.payment_status} />
+                  </div>
+                  <div style={styles.buttonRow}>
+                    {order.status === "pending" && (
+                      <>
+                        <button type="button" onClick={() => updateBarberProductOrder(order._id, "confirmed")} style={styles.smallButton}>Confirm</button>
+                        <button type="button" onClick={() => updateBarberProductOrder(order._id, "cancelled")} style={styles.dangerButton}>Cancel</button>
+                      </>
+                    )}
+                    {order.status === "confirmed" && (
+                      <>
+                        <button type="button" onClick={() => updateBarberProductOrder(order._id, "completed")} style={styles.smallButton}>Mark completed</button>
+                        <button type="button" onClick={() => updateBarberProductOrder(order._id, "cancelled")} style={styles.dangerButton}>Cancel</button>
+                      </>
+                    )}
+                    {order.payment_status === "unpaid" && order.status !== "cancelled" && (
+                      <button type="button" onClick={() => updateBarberProductOrder(order._id, null, "paid")} style={styles.smallButton}>Mark paid</button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -4511,6 +5153,28 @@ function App() {
               >
                 Book Appointment
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerTab("shop");
+                  setCustomerMenuOpen(false);
+                  loadProducts();
+                }}
+                style={styles.menuItem}
+              >
+                Shop
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerTab("productOrders");
+                  setCustomerMenuOpen(false);
+                  loadCustomerProductOrders();
+                }}
+                style={styles.menuItem}
+              >
+                My Product Orders
+              </button>
               <button type="button" onClick={logout} style={styles.menuItem}>Logout</button>
               <button
                 type="button"
@@ -4554,6 +5218,28 @@ function App() {
         >
           <Icon name="bookings" />
           My Bookings
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCustomerTab("shop");
+            loadProducts();
+          }}
+          style={{ ...styles.tabButton, ...(customerTab === "shop" ? styles.activeTab : {}) }}
+        >
+          <Icon name="shop" />
+          Shop
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCustomerTab("productOrders");
+            loadCustomerProductOrders();
+          }}
+          style={{ ...styles.tabButton, ...(customerTab === "productOrders" ? styles.activeTab : {}) }}
+        >
+          <Icon name="products" />
+          My Product Orders
         </button>
       </div>
 
@@ -4878,6 +5564,91 @@ function App() {
                 </div>
               )}
             </>
+          )}
+        </section>
+      )}
+
+      {customerTab === "shop" && (
+        <section style={styles.panel}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="shop" /> Shop</h2>
+            <button type="button" onClick={loadProducts} style={styles.smallButton}>Refresh</button>
+          </div>
+          {shopMessage && <p style={styles.message}>{shopMessage}</p>}
+          {customerProducts.length === 0 ? (
+            <p style={styles.message}>No products available right now</p>
+          ) : (
+            <div style={styles.list}>
+              {customerProducts.map((product) => (
+                <div key={product._id} style={styles.listItem}>
+                  {product.image ? (
+                    <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
+                  ) : (
+                    <div style={styles.salonPhotoPlaceholder}>Product image</div>
+                  )}
+                  <strong>{product.name}</strong>
+                  <span>{product.description || product.category || "Product"}</span>
+                  <span>Rs. {product.price}</span>
+                  <span>Stock: {product.stock_quantity}</span>
+                  <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Barber"}</span>
+                  <span>Salon: {product.salon_id?.name || "Pickup details from barber"}</span>
+                  <div style={styles.filterGrid}>
+                    <div>
+                      <label style={styles.label}>Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={product.stock_quantity || 1}
+                        value={productOrderQuantities[product._id] || 1}
+                        onChange={(event) => setProductOrderQuantities((current) => ({
+                          ...current,
+                          [product._id]: event.target.value
+                        }))}
+                        style={styles.input}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => placeProductOrder(product)}
+                    disabled={loading || product.active === false || product.stock_quantity < 1}
+                    style={styles.primaryButton}
+                  >
+                    {product.stock_quantity < 1 ? "Out of stock" : "Order for pickup"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {customerTab === "productOrders" && (
+        <section style={styles.panel}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> My Product Orders</h2>
+            <button type="button" onClick={loadCustomerProductOrders} style={styles.smallButton}>Refresh</button>
+          </div>
+          {shopMessage && <p style={styles.message}>{shopMessage}</p>}
+          {customerProductOrders.length === 0 ? (
+            <p style={styles.message}>No product orders yet</p>
+          ) : (
+            <div style={styles.list}>
+              {customerProductOrders.map((order) => (
+                <div key={order._id} style={styles.listItem}>
+                  <strong>{order.product_id?.name || "Product"}</strong>
+                  <span>Barber: {order.barber_id?.name || order.barber_id?.phone || "Barber"}</span>
+                  <span>Salon: {order.salon_id?.name || "Not linked to a salon"}</span>
+                  <span>Quantity: {order.quantity}</span>
+                  <span>Total: Rs. {order.total_amount}</span>
+                  <span>Created: {formatDateTime(order.createdAt)}</span>
+                  <div style={styles.buttonRow}>
+                    <StatusBadge status={order.status} />
+                    <StatusBadge status={order.payment_status} />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
       )}
