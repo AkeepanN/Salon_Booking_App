@@ -296,6 +296,7 @@ function App() {
   const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "30" });
   const [productForm, setProductForm] = useState({
     name: "",
+    brand: "",
     description: "",
     price: "",
     stock_quantity: "",
@@ -323,6 +324,10 @@ function App() {
   const [customerProducts, setCustomerProducts] = useState([]);
   const [customerProductOrders, setCustomerProductOrders] = useState([]);
   const [productOrderQuantities, setProductOrderQuantities] = useState({});
+  const [productSearch, setProductSearch] = useState("");
+  const [productSalonFilter, setProductSalonFilter] = useState("");
+  const [productListingMode, setProductListingMode] = useState("salon");
+  const [customerProductLocation, setCustomerProductLocation] = useState(null);
   const [shopMessage, setShopMessage] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [ratingModalBooking, setRatingModalBooking] = useState(null);
@@ -425,6 +430,22 @@ function App() {
       completed: sortBookingsForTab(customerBookings.filter((booking) => booking.status === "completed"), "completed")
     };
   }, [customerBookings]);
+  const shopSalonOptions = useMemo(() => {
+    const byId = new Map();
+    salons.forEach((salon) => {
+      if (salon?._id) {
+        byId.set(salon._id, salon);
+      }
+    });
+    customerProducts.forEach((product) => {
+      const salon = product.salon_id;
+      if (salon?._id && !byId.has(salon._id)) {
+        byId.set(salon._id, salon);
+      }
+    });
+
+    return [...byId.values()].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  }, [salons, customerProducts]);
   const adminUserTabs = useMemo(() => ({
     active: adminUsers.filter((user) => (user.status || (user.active === false ? "blocked" : "active")) === "active"),
     blocked: adminUsers.filter((user) => (user.status || "") === "blocked"),
@@ -1042,7 +1063,7 @@ function App() {
     setBarberProducts([]);
     setBarberProductOrders([]);
     setBarberProductMessage("");
-    setProductForm({ name: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
+    setProductForm({ name: "", brand: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
     setProductImageFile(null);
     setProductImagePreview("");
     setEditingProductId("");
@@ -1057,6 +1078,10 @@ function App() {
     setCustomerProducts([]);
     setCustomerProductOrders([]);
     setProductOrderQuantities({});
+    setProductSearch("");
+    setProductSalonFilter("");
+    setProductListingMode("salon");
+    setCustomerProductLocation(null);
     setShopMessage("");
     setCustomerMenuOpen(false);
     setRatingModalBooking(null);
@@ -1114,9 +1139,28 @@ function App() {
     }
   };
 
-  const loadProducts = async () => {
+  const loadProducts = async (options = {}) => {
     try {
-      const res = await fetch(`${API_BASE}/products`);
+      const nextMode = options.mode ?? productListingMode;
+      const nextLocation = options.location ?? customerProductLocation;
+      const params = new URLSearchParams();
+
+      if ((options.search ?? productSearch).trim()) {
+        params.set("search", (options.search ?? productSearch).trim());
+      }
+
+      if (options.salonId ?? productSalonFilter) {
+        params.set("salon_id", options.salonId ?? productSalonFilter);
+      }
+
+      if (nextMode === "nearby" && nextLocation?.lat != null && nextLocation?.lng != null) {
+        params.set("lat", String(nextLocation.lat));
+        params.set("lng", String(nextLocation.lng));
+        params.set("sort", "distance");
+      }
+
+      const query = params.toString();
+      const res = await fetch(`${API_BASE}/products${query ? `?${query}` : ""}`);
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
@@ -1125,9 +1169,43 @@ function App() {
       }
 
       setCustomerProducts(data);
+      if (options.mode) {
+        setProductListingMode(options.mode);
+      }
+      if (options.location !== undefined) {
+        setCustomerProductLocation(options.location);
+      }
     } catch (error) {
       setShopMessage("Could not connect to the server");
     }
+  };
+
+  const applyProductFilters = async () => {
+    setShopMessage("");
+    if (productListingMode === "nearby") {
+      if (!navigator.geolocation) {
+        setShopMessage("Geolocation is not supported by this browser");
+        await loadProducts({ mode: "salon", location: null });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const location = {
+            lat: Number(position.coords.latitude.toFixed(6)),
+            lng: Number(position.coords.longitude.toFixed(6)),
+          };
+          await loadProducts({ mode: "nearby", location });
+        },
+        async () => {
+          setShopMessage("Location permission denied. Showing normal product list.");
+          await loadProducts({ mode: "salon", location: null });
+        }
+      );
+      return;
+    }
+
+    await loadProducts({ mode: "salon", location: null });
   };
 
   const loadPaymentRules = async () => {
@@ -1679,7 +1757,7 @@ function App() {
     setBoardPhotoPreview("");
     setBoardPhotoMessage("");
     setServiceForm({ name: "", price: "", duration: "30" });
-    setProductForm({ name: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
+    setProductForm({ name: "", brand: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
     setReserveForm({ date: today, start_time: "12:00", end_time: "12:30", reason: "" });
     setReserveMessage("");
     setWorkingHoursMessage("");
@@ -1726,6 +1804,7 @@ function App() {
   const resetProductForm = () => {
     setProductForm({
       name: "",
+      brand: "",
       description: "",
       price: "",
       stock_quantity: "",
@@ -2059,6 +2138,7 @@ function App() {
     try {
       const formData = new FormData();
       formData.append("name", productForm.name.trim());
+      formData.append("brand", productForm.brand.trim());
       formData.append("description", productForm.description.trim());
       formData.append("price", productForm.price);
       formData.append("stock_quantity", productForm.stock_quantity);
@@ -2101,6 +2181,7 @@ function App() {
     setEditingProductId(product._id);
     setProductForm({
       name: product.name || "",
+      brand: product.brand || "",
       description: product.description || "",
       price: product.price ?? "",
       stock_quantity: product.stock_quantity ?? "",
@@ -4179,14 +4260,16 @@ function App() {
             <h3 style={styles.compactTitle}>{editingProductId ? "Edit product" : "Add product"}</h3>
             <label style={styles.label}>Product name</label>
             <input value={productForm.name} onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Brand</label>
+            <input value={productForm.brand} onChange={(event) => setProductForm((current) => ({ ...current, brand: event.target.value }))} style={styles.input} />
+            <label style={styles.label}>Category</label>
+            <input value={productForm.category} onChange={(event) => setProductForm((current) => ({ ...current, category: event.target.value }))} style={styles.input} />
             <label style={styles.label}>Description</label>
             <textarea value={productForm.description} onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))} style={styles.input} rows={3} />
             <label style={styles.label}>Price</label>
             <input type="number" min="0" step="0.01" value={productForm.price} onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))} style={styles.input} />
             <label style={styles.label}>Stock quantity</label>
             <input type="number" min="0" step="1" value={productForm.stock_quantity} onChange={(event) => setProductForm((current) => ({ ...current, stock_quantity: event.target.value }))} style={styles.input} />
-            <label style={styles.label}>Category</label>
-            <input value={productForm.category} onChange={(event) => setProductForm((current) => ({ ...current, category: event.target.value }))} style={styles.input} />
             <label style={styles.label}>Salon optional</label>
             <select value={productForm.salon_id} onChange={(event) => setProductForm((current) => ({ ...current, salon_id: event.target.value }))} style={styles.input}>
               <option value="">Not linked to a salon</option>
@@ -4236,6 +4319,7 @@ function App() {
                     <div style={styles.salonPhotoPlaceholder}>Product image</div>
                   )}
                   <strong>{product.name}</strong>
+                  <span>Brand: {product.brand || "Unbranded"}</span>
                   <span>{product.category || "General"}</span>
                   <span>Rs. {product.price}</span>
                   <span>Stock: {product.stock_quantity}</span>
@@ -5572,9 +5656,50 @@ function App() {
         <section style={styles.panel}>
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitleWithIcon}><Icon name="shop" /> Shop</h2>
-            <button type="button" onClick={loadProducts} style={styles.smallButton}>Refresh</button>
+            <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Refresh</button>
           </div>
           {shopMessage && <p style={styles.message}>{shopMessage}</p>}
+          <div style={styles.filterGrid}>
+            <div>
+              <label style={styles.label}>Search products</label>
+              <input
+                value={productSearch}
+                onChange={(event) => setProductSearch(event.target.value)}
+                placeholder="Search by name, brand, or category"
+                style={styles.input}
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Salon</label>
+              <select
+                value={productSalonFilter}
+                onChange={(event) => setProductSalonFilter(event.target.value)}
+                style={styles.input}
+              >
+                <option value="">All salons</option>
+                {shopSalonOptions.map((salon) => (
+                  <option key={salon._id} value={salon._id}>{salon.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Listing mode</label>
+              <select
+                value={productListingMode}
+                onChange={(event) => setProductListingMode(event.target.value)}
+                style={styles.input}
+              >
+                <option value="salon">Products by selected salon</option>
+                <option value="nearby">Nearby products by distance</option>
+              </select>
+            </div>
+          </div>
+          <div style={styles.buttonRow}>
+            <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Apply filters</button>
+            {productListingMode === "nearby" && (
+              <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Use my location</button>
+            )}
+          </div>
           {customerProducts.length === 0 ? (
             <p style={styles.message}>No products available right now</p>
           ) : (
@@ -5587,11 +5712,16 @@ function App() {
                     <div style={styles.salonPhotoPlaceholder}>Product image</div>
                   )}
                   <strong>{product.name}</strong>
-                  <span>{product.description || product.category || "Product"}</span>
+                  <span>Brand: {product.brand || "Unbranded"}</span>
+                  <span>{product.category || "General"}</span>
+                  <span>{product.description || "Product"}</span>
                   <span>Rs. {product.price}</span>
                   <span>Stock: {product.stock_quantity}</span>
                   <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Barber"}</span>
                   <span>Salon: {product.salon_id?.name || "Pickup details from barber"}</span>
+                  {product.distance_km != null && (
+                    <span>{product.distance_km} km away</span>
+                  )}
                   <div style={styles.filterGrid}>
                     <div>
                       <label style={styles.label}>Quantity</label>

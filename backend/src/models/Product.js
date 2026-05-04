@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema(
     barber_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     salon_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Salon', default: null },
     name: { type: String, required: true, trim: true },
+    brand: { type: String, required: true, trim: true },
     description: { type: String, trim: true, default: '' },
     price: { type: Number, required: true, min: 0 },
     stock_quantity: { type: Number, required: true, min: 0 },
@@ -17,6 +18,6 @@ const productSchema = new mongoose.Schema(
 
 productSchema.index({ barber_id: 1, createdAt: -1 });
 productSchema.index({ active: 1, createdAt: -1 });
-productSchema.index({ name: 'text', description: 'text', category: 'text' });
+productSchema.index({ name: 'text', brand: 'text', description: 'text', category: 'text' });
 
 module.exports = mongoose.model('Product', productSchema);

@@ -60,6 +60,18 @@ function normalizeProduct(product) {
   return product;
 }
 
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function validateOwnedSalon(barberId, salonId) {
   if (!salonId) {
     return null;
@@ -85,18 +97,78 @@ function parseQuantity(value) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const query = { active: true };
+    const query = {
+      active: true,
+      stock_quantity: { $gt: 0 },
+    };
 
-    if (req.query.search) {
-      query.$text = { $search: req.query.search };
+    if (req.query.salon_id) {
+      query.salon_id = req.query.salon_id;
+    }
+
+    if (req.query.search?.trim()) {
+      const pattern = new RegExp(req.query.search.trim(), 'i');
+      query.$or = [
+        { name: pattern },
+        { brand: pattern },
+        { category: pattern },
+      ];
     }
 
     const products = await Product.find(query)
       .populate('barber_id', 'name phone')
-      .populate('salon_id', 'name address phone')
-      .sort({ createdAt: -1 });
+      .populate('salon_id', 'name address phone latitude longitude active status approval_status')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json(products.map(normalizeProduct));
+    const activeProducts = products.filter((product) => {
+      if (!product.salon_id) {
+        return true;
+      }
+
+      return product.salon_id.active !== false &&
+        (product.salon_id.status === 'active' || product.salon_id.status === undefined) &&
+        product.salon_id.approval_status === 'approved';
+    });
+
+    let response = activeProducts.map(normalizeProduct);
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      response = response.map((product) => {
+        if (!product.salon_id?.latitude || !product.salon_id?.longitude) {
+          return { ...product, distance_km: null };
+        }
+
+        return {
+          ...product,
+          distance_km: Number(
+            distanceKm(lat, lng, Number(product.salon_id.latitude), Number(product.salon_id.longitude)).toFixed(2)
+          ),
+        };
+      });
+    }
+
+    if (req.query.sort === 'distance' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+      response.sort((a, b) => {
+        if (a.distance_km == null && b.distance_km == null) {
+          return 0;
+        }
+
+        if (a.distance_km == null) {
+          return 1;
+        }
+
+        if (b.distance_km == null) {
+          return -1;
+        }
+
+        return a.distance_km - b.distance_km;
+      });
+    }
+
+    res.json(response);
   } catch (error) {
     next(error);
   }
@@ -116,7 +188,7 @@ router.get('/mine', auth, requireRole('barber'), async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const product = await Product.findOne({ _id: req.params.id, active: true })
+    const product = await Product.findOne({ _id: req.params.id, active: true, stock_quantity: { $gt: 0 } })
       .populate('barber_id', 'name phone')
       .populate('salon_id', 'name address phone');
 
@@ -135,6 +207,7 @@ router.post('/', auth, requireRole('barber'), uploadProductImage.single('image')
     const {
       salon_id,
       name,
+      brand,
       description,
       price,
       stock_quantity,
@@ -145,11 +218,11 @@ router.post('/', auth, requireRole('barber'), uploadProductImage.single('image')
     const parsedPrice = parseMoney(price);
     const parsedStock = parseQuantity(stock_quantity);
 
-    if (!name?.trim() || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock)) {
+    if (!name?.trim() || !brand?.trim() || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock)) {
       if (req.file) {
         await fs.promises.unlink(req.file.path).catch(() => {});
       }
-      return res.status(400).json({ message: 'Product name, price, and stock quantity are required' });
+      return res.status(400).json({ message: 'Product name, brand, price, and stock quantity are required' });
     }
 
     if (parsedPrice < 0) {
@@ -178,6 +251,7 @@ router.post('/', auth, requireRole('barber'), uploadProductImage.single('image')
       barber_id: req.user._id,
       salon_id: salon ? salon._id : null,
       name: name.trim(),
+      brand: brand.trim(),
       description: description?.trim() || '',
       price: parsedPrice,
       stock_quantity: parsedStock,
@@ -231,6 +305,16 @@ router.patch('/:id', auth, requireRole('barber'), uploadProductImage.single('ima
         return res.status(400).json({ message: 'Product name is required' });
       }
       product.name = req.body.name.trim();
+    }
+
+    if (req.body.brand !== undefined) {
+      if (!req.body.brand.trim()) {
+        if (req.file) {
+          await fs.promises.unlink(req.file.path).catch(() => {});
+        }
+        return res.status(400).json({ message: 'Product brand is required' });
+      }
+      product.brand = req.body.brand.trim();
     }
 
     if (req.body.description !== undefined) {
