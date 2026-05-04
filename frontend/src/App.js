@@ -1302,6 +1302,7 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/salons`);
       const data = await res.json().catch(() => []);
+      console.log("Loaded salons:", data);
 
       if (!res.ok) {
         setMessage(data.message || "Could not load salons");

@@ -176,10 +176,8 @@ router.get('/', async (req, res, next) => {
   try {
     const query = {
       active: { $ne: false },
-      $and: [
-        { $or: [{ status: 'active' }, { status: { $exists: false } }] },
-        { $or: [{ approval_status: 'approved' }, { approval_status: { $exists: false } }] },
-      ],
+      status: { $nin: ['blocked', 'deleted'] },
+      approval_status: { $ne: 'rejected' },
     };
 
     if (req.query.search) {
@@ -210,10 +208,8 @@ router.get('/nearby', async (req, res, next) => {
 
     const salons = await Salon.find({
       active: { $ne: false },
-      $and: [
-        { $or: [{ status: 'active' }, { status: { $exists: false } }] },
-        { $or: [{ approval_status: 'approved' }, { approval_status: { $exists: false } }] },
-      ],
+      status: { $nin: ['blocked', 'deleted'] },
+      approval_status: { $ne: 'rejected' },
       latitude: { $exists: true },
       longitude: { $exists: true },
     }).select('name address phone board_photo_url latitude longitude workingHours active status approval_status createdAt');
@@ -250,10 +246,8 @@ router.get('/:salonId/availability', async (req, res, next) => {
       Salon.findOne({
         _id: req.params.salonId,
         active: { $ne: false },
-        $and: [
-          { $or: [{ status: 'active' }, { status: { $exists: false } }] },
-          { $or: [{ approval_status: 'approved' }, { approval_status: { $exists: false } }] },
-        ],
+        status: { $nin: ['blocked', 'deleted'] },
+        approval_status: { $ne: 'rejected' },
       }),
       Service.findOne({ _id: service_id, salon_id: req.params.salonId, active: { $ne: false } }),
     ]);
