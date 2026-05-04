@@ -77,6 +77,83 @@ function professionalTypeLabel(type) {
   return "Barber";
 }
 
+function providerServicesLabel(type) {
+  if (type === "beautician") {
+    return "Beauty Services";
+  }
+
+  if (type === "makeup_artist") {
+    return "Makeup Services";
+  }
+
+  return "Hair Services";
+}
+
+function providerIconName(type) {
+  if (type === "beautician") {
+    return "beautician";
+  }
+
+  if (type === "makeup_artist") {
+    return "makeup_artist";
+  }
+
+  return "barber";
+}
+
+function providerTheme(type) {
+  if (type === "beautician") {
+    return {
+      hero: {
+        backgroundImage: "linear-gradient(90deg, rgba(99, 35, 89, 0.88), rgba(244, 114, 182, 0.18)), url('/assets/barber-hero-photo.png')"
+      },
+      avatarButton: {
+        borderColor: "#be185d",
+        background: "#fff1f6",
+        color: "#be185d"
+      },
+      badge: {
+        background: "#fff1f6",
+        color: "#be185d"
+      },
+      activeTab: {
+        borderColor: "#be185d",
+        background: "#fff1f6",
+        color: "#be185d"
+      }
+    };
+  }
+
+  if (type === "makeup_artist") {
+    return {
+      hero: {
+        backgroundImage: "linear-gradient(90deg, rgba(55, 35, 99, 0.88), rgba(129, 140, 248, 0.22)), url('/assets/barber-hero-photo.png')"
+      },
+      avatarButton: {
+        borderColor: "#6d28d9",
+        background: "#f5f3ff",
+        color: "#6d28d9"
+      },
+      badge: {
+        background: "#f5f3ff",
+        color: "#6d28d9"
+      },
+      activeTab: {
+        borderColor: "#6d28d9",
+        background: "#f5f3ff",
+        color: "#6d28d9"
+      }
+    };
+  }
+
+  return {
+    hero: {},
+    avatarButton: {},
+    badge: {},
+    activeTab: {}
+  };
+}
+
 function serviceCategoryLabel(category) {
   if (category === "beauty") {
     return "Beauty";
@@ -172,6 +249,8 @@ function Icon({ name }) {
     booking: "M7 3v3M17 3v3M4 8h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm4 8 2 2 4-5",
     bookings: "M7 6h10M7 12h10M7 18h6M4 5h.01M4 11h.01M4 17h.01",
     barber: "M6 4l12 16M18 4 6 20M8.5 7.5l7 0M8.5 16.5h7",
+    beautician: "M12 3l1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3L7.5 7.5l3.3-1.2L12 3Zm6 10 1 2.4L21 16l-2 1.1L18 19.5 17 17.1 15 16l2-.6L18 13Zm-12 0 1 2.4L9 16l-2 1.1L6 19.5 5 17.1 3 16l2-.6L6 13Z",
+    makeup_artist: "M14 4c3 0 5 2 5 5 0 2-1.2 3.8-3 4.6V20l-2-1-2 1v-6.4A5 5 0 0 1 9 9c0-3 2-5 5-5Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM5 20c1.7 0 3-1.3 3-3v-1H6a3 3 0 0 0-3 3v1h2Z",
     admin: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4Zm-3 9 2 2 4-4",
     salons: "M4 20h16M6 20V9l6-5 6 5v11M9 20v-6h6v6",
     services: "M7 7h10M7 12h10M7 17h7M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z",
@@ -444,12 +523,17 @@ function App() {
   });
 
   const isLoggedIn = Boolean(token);
+  const providerType = currentUser?.professional_type || "barber";
+  const providerLabel = professionalTypeLabel(providerType);
+  const providerServicesTitle = providerServicesLabel(providerType);
+  const providerIcon = providerIconName(providerType);
+  const providerThemeStyles = providerTheme(providerType);
   const selectedBarberSalon = useMemo(
     () => barberSalons.find((salon) => salon._id === selectedBarberSalonId),
     [barberSalons, selectedBarberSalonId]
   );
   const barberInitials = useMemo(() => {
-    const name = currentUser?.name || "Barber";
+    const name = currentUser?.name || "Service Provider";
     return name
       .split(" ")
       .filter(Boolean)
@@ -886,7 +970,7 @@ function App() {
     const headers = [
       "Date",
       "Customer",
-      ...(includeBarber ? ["Barber"] : []),
+      ...(includeBarber ? ["Service Provider"] : []),
       "Salon",
       "Service",
       "Status",
@@ -894,7 +978,7 @@ function App() {
       "Booking Fee",
       "Cancellation Charge",
       "Admin Commission",
-      "Barber Earning",
+      "Service Provider Earning",
       "Payment Status"
     ];
     const rows = report.items.map((item) => [
@@ -1069,7 +1153,7 @@ function App() {
     }
 
     if (authForm.role === "barber" && !signupProfilePhoto) {
-      setMessage("Profile photo is required for barber signup");
+        setMessage("Profile photo is required for service provider signup");
       setLoading(false);
       return;
     }
@@ -1694,7 +1778,7 @@ function App() {
     return (
       <>
         <span>Cancelled by: {roleLabel(booking.cancelled_by_role)}</span>
-        <span>Barber earned: Rs. {earning}</span>
+        <span>Service Provider earned: Rs. {earning}</span>
         <span>Source: {earning > 0 ? "Cancellation charge after commission" : "No cancellation earning"}</span>
       </>
     );
@@ -3152,8 +3236,8 @@ function App() {
       charge,
       title: charge ? "Charge cancellation fee?" : "Waive cancellation fee?",
       body: charge
-        ? "Customer charge, admin commission, and barber earning will use the stored booking rules."
-        : "Customer charge, admin commission, and barber earning will show as Rs. 0."
+        ? "Customer charge, admin commission, and service provider earning will use the stored booking rules."
+        : "Customer charge, admin commission, and service provider earning will show as Rs. 0."
     });
   };
 
@@ -3357,7 +3441,7 @@ function App() {
                   style={styles.input}
                 >
                   <option value="customer">Customer</option>
-                  <option value="barber">Barber</option>
+                  <option value="barber">Service Provider</option>
                 </select>
 
                 {authForm.role === "barber" && (
@@ -3372,7 +3456,7 @@ function App() {
                       <option value="beautician">Beautician</option>
                       <option value="makeup_artist">Makeup Artist</option>
                     </select>
-                    <h3 style={styles.compactTitle}>{professionalTypeLabel(authForm.professional_type)} profile photo</h3>
+                    <h3 style={styles.compactTitle}>Service Provider profile photo</h3>
                     {signupProfilePreview ? (
                       <img
                         src={signupProfilePreview}
@@ -3597,7 +3681,7 @@ function App() {
                   <span>Remaining pay at salon: Rs. {bookingFeeExample?.remaining_pay_at_salon ?? 1000}</span>
                   <span>Cancellation charge: {cancellationChargeForm || 0}% = Rs. {bookingFeeExample?.cancellation_charge_amount ?? 0}</span>
                   <span>Platform commission: {commissionForm || 0}% = Rs. {bookingFeeExample?.platform_commission_amount ?? 0}</span>
-                  <span>Barber earning from advance: Rs. {bookingFeeExample?.barber_earning_from_advance ?? bookingFeeExample?.barber_earning_amount ?? 0}</span>
+                  <span>Service provider earning from advance: Rs. {bookingFeeExample?.barber_earning_from_advance ?? bookingFeeExample?.barber_earning_amount ?? 0}</span>
                 </div>
 
                 <div style={styles.sectionHeader}>
@@ -3647,7 +3731,7 @@ function App() {
                     <div style={styles.summaryCard}><strong>Booking fees</strong><span>Rs. {adminEarnings.summary.total_booking_fees}</span></div>
                     <div style={styles.summaryCard}><strong>Cancellation charges</strong><span>Rs. {adminEarnings.summary.total_cancellation_charges}</span></div>
                     <div style={styles.summaryCard}><strong>Admin commission</strong><span>Rs. {adminEarnings.summary.total_admin_commission}</span></div>
-                    <div style={styles.summaryCard}><strong>Barber earnings</strong><span>Rs. {adminEarnings.summary.total_barber_earnings}</span></div>
+                    <div style={styles.summaryCard}><strong>Service provider earnings</strong><span>Rs. {adminEarnings.summary.total_barber_earnings}</span></div>
                     <div style={styles.summaryCard}><strong>Total bookings</strong><span>{adminEarnings.summary.total_bookings}</span></div>
                   </div>
                 )}
@@ -3658,13 +3742,13 @@ function App() {
                       <tr>
                         <th style={styles.th}>Date</th>
                         <th style={styles.th}>Customer</th>
-                        <th style={styles.th}>Barber</th>
+                        <th style={styles.th}>Service Provider</th>
                         <th style={styles.th}>Salon</th>
                         <th style={styles.th}>Service</th>
                         <th style={styles.th}>Status</th>
                         <th style={styles.th}>Service Price</th>
                         <th style={styles.th}>Admin Commission</th>
-                        <th style={styles.th}>Barber Earning</th>
+                        <th style={styles.th}>Service Provider Earning</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3879,7 +3963,7 @@ function App() {
                       <span>{product.category || "General"}</span>
                       <span>Rs. {product.price}</span>
                       <span>Stock: {product.stock_quantity}</span>
-                      <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Unknown"}</span>
+                      <span>Service Provider: {product.barber_id?.name || product.barber_id?.phone || "Unknown"}</span>
                       <span>Salon: {product.salon_id?.name || "Not linked to a salon"}</span>
                       <span>Status: {product.active === false ? "Inactive" : "Active"}</span>
                       <div style={styles.buttonRow}>
@@ -3905,7 +3989,7 @@ function App() {
                     <div key={order._id} style={styles.listItem}>
                       <strong>{order.product_id?.name || "Product"}</strong>
                       <span>Customer: {order.customer_id?.name || order.customer_id?.phone || "Customer"}</span>
-                      <span>Barber: {order.barber_id?.name || order.barber_id?.phone || "Barber"}</span>
+                      <span>Service Provider: {order.barber_id?.name || order.barber_id?.phone || "Service Provider"}</span>
                       <span>Salon: {order.salon_id?.name || "Not linked"}</span>
                       <span>Quantity: {order.quantity}</span>
                       <span>Total: Rs. {order.total_amount}</span>
@@ -4003,7 +4087,7 @@ function App() {
                       {booking.status === "completed" && (
                         <>
                           <span>Admin commission: Rs. {booking.admin_commission_amount ?? booking.commission_amount ?? booking.platform_commission_amount ?? 0}</span>
-                          <span>Barber earning: Rs. {booking.barber_earning_amount ?? 0}</span>
+                          <span>Service provider earning: Rs. {booking.barber_earning_amount ?? 0}</span>
                           <span>Payment: {booking.payment_status || "unpaid"}</span>
                         </>
                       )}
@@ -4012,7 +4096,7 @@ function App() {
                           <span>Cancelled by: {roleLabel(booking.cancelled_by_role)}</span>
                           <span>Customer charged: Rs. {visibleCancellationCharge(booking)}</span>
                           <span>Admin commission: Rs. {visibleAdminCommission(booking)}</span>
-                          <span>Barber earning: Rs. {visibleBarberEarning(booking)}</span>
+                          <span>Service provider earning: Rs. {visibleBarberEarning(booking)}</span>
                           <span>{visibleCancellationCharge(booking) > 0 ? "Charged" : "Waived / no charge"}</span>
                         </>
                       )}
@@ -4068,8 +4152,8 @@ function App() {
             <button
               type="button"
               onClick={() => setBarberMenuOpen((open) => !open)}
-              style={styles.avatarButton}
-              aria-label="Open barber menu"
+              style={{ ...styles.avatarButton, ...providerThemeStyles.avatarButton }}
+              aria-label="Open service provider menu"
             >
               {currentUser?.profilePhotoUrl || currentUser?.profile_photo_url ? (
                 <img src={imageUrl(currentUser.profilePhotoUrl || currentUser.profile_photo_url)} alt="" style={styles.avatarImage} />
@@ -4115,12 +4199,14 @@ function App() {
           </div>
         </nav>
 
-        <section style={{ ...styles.hero, ...styles.barberHero }}>
-          <h1 style={styles.titleWithIcon}><Icon name="barber" /> Barber Dashboard</h1>
+        <section style={{ ...styles.hero, ...styles.barberHero, ...providerThemeStyles.hero }}>
+          <h1 style={styles.titleWithIcon}><Icon name={providerIcon} /> Service Provider Dashboard</h1>
           <p style={styles.heroSubtitle}>
             {selectedBarberSalon ? `Managing ${selectedBarberSalon.name}` : "Select a salon to manage bookings and services."}
           </p>
-          <p style={styles.heroSubtitle}>{professionalTypeLabel(currentUser?.professional_type || "barber")}</p>
+          <div style={{ ...styles.topSalonBadge, ...styles.providerHeroBadge, ...providerThemeStyles.badge }}>
+            Service Provider ({providerLabel})
+          </div>
         </section>
 
         {barberNotice && (
@@ -4148,9 +4234,9 @@ function App() {
           <button
             type="button"
             onClick={() => setBarberMainTab("dashboard")}
-            style={{ ...styles.tabButton, ...(barberMainTab === "dashboard" ? styles.activeTab : {}) }}
+            style={{ ...styles.tabButton, ...(barberMainTab === "dashboard" ? { ...styles.activeTab, ...providerThemeStyles.activeTab } : {}) }}
           >
-            <Icon name="barber" />
+            <Icon name={providerIcon} />
             Dashboard
           </button>
           <button
@@ -4278,7 +4364,7 @@ function App() {
                   {booking.status === "completed" && (
                     <>
                       <span>Service price: Rs. {booking.service_price ?? booking.total_amount ?? 0}</span>
-                      <span>Barber earned: Rs. {booking.barber_earning_amount ?? 0}</span>
+                      <span>Service Provider earned: Rs. {booking.barber_earning_amount ?? 0}</span>
                       <span>Admin commission deducted: Rs. {booking.admin_commission_amount ?? booking.commission_amount ?? booking.platform_commission_amount ?? 0}</span>
                     </>
                   )}
@@ -4349,7 +4435,7 @@ function App() {
         {barberMainTab === "dashboard" && (
         <section style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="services" /> Services summary</h2>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="services" /> {providerServicesTitle}</h2>
             <button type="button" onClick={() => openBarberModal("service")} style={styles.smallButton}>Manage services</button>
           </div>
 
@@ -4548,7 +4634,7 @@ function App() {
                 <h2 style={styles.sectionTitle}>
                   {barberModal === "profile" && "Profile"}
                   {barberModal === "salons" && "Manage salons"}
-                  {barberModal === "service" && "Services"}
+                  {barberModal === "service" && providerServicesTitle}
                   {barberModal === "hours" && "Working hours"}
                   {barberModal === "reserve" && "Reserve time slot"}
                   {barberModal === "photo" && "Salon board photo"}
@@ -4562,7 +4648,10 @@ function App() {
 
               {barberModal === "profile" && (
                 <div style={styles.listItem}>
-                  <strong>{currentUser?.name || "Barber"}</strong>
+                  <strong>{currentUser?.name || "Service Provider"}</strong>
+                  <span style={{ ...styles.topSalonBadge, ...providerThemeStyles.badge }}>
+                    Service Provider ({providerLabel})
+                  </span>
                   <span>{currentUser?.phone || "No phone saved"}</span>
                   <span>Profile editing coming soon</span>
                 </div>
@@ -4579,7 +4668,14 @@ function App() {
                         style={{ ...styles.salonCard, ...(selectedBarberSalonId === salon._id ? styles.activeSalonCard : {}) }}
                       >
                         <strong style={styles.salonName}>{salon.name}</strong>
-                        <span style={styles.topSalonBadge}>{professionalTypeLabel(salon.professional_type || "barber")}</span>
+                        <span
+                          style={{
+                            ...styles.topSalonBadge,
+                            ...providerTheme(salon.professional_type || "barber").badge
+                          }}
+                        >
+                          {professionalTypeLabel(salon.professional_type || "barber")}
+                        </span>
                         <span style={styles.salonText}>{salon.address}</span>
                         <span style={styles.salonText}>{salon.phone}</span>
                       </button>
@@ -4812,7 +4908,7 @@ function App() {
                   <div style={styles.summaryCard}><strong>Booking fees</strong><span>Rs. {barberEarnings.summary.total_booking_fees}</span></div>
                   <div style={styles.summaryCard}><strong>Cancellation charges</strong><span>Rs. {barberEarnings.summary.total_cancellation_charges}</span></div>
                   <div style={styles.summaryCard}><strong>Admin commission</strong><span>Rs. {barberEarnings.summary.total_admin_commission}</span></div>
-                  <div style={styles.summaryCard}><strong>Barber earnings</strong><span>Rs. {barberEarnings.summary.total_barber_earnings}</span></div>
+                  <div style={styles.summaryCard}><strong>Service provider earnings</strong><span>Rs. {barberEarnings.summary.total_barber_earnings}</span></div>
                   <div style={styles.summaryCard}><strong>Total bookings</strong><span>{barberEarnings.summary.total_bookings}</span></div>
                 </div>
               )}
@@ -4834,7 +4930,7 @@ function App() {
                         <span>Cancellation charge: Rs. {item.cancellation_charge_amount}</span>
                       )}
                       <span>Admin commission: Rs. {item.admin_commission_amount}</span>
-                      <span>Barber earning: Rs. {item.barber_earning_amount}</span>
+                      <span>Service provider earning: Rs. {item.barber_earning_amount}</span>
                     </div>
                   ))}
                 </div>
@@ -4861,7 +4957,7 @@ function App() {
         </nav>
 
         <section style={styles.panel}>
-          <h1 style={styles.titleWithIcon}><Icon name="barber" /> Barber Dashboard</h1>
+          <h1 style={styles.titleWithIcon}><Icon name="barber" /> Service Provider Dashboard</h1>
           <p style={styles.subtitle}>Manage your salons, services, and today's appointments.</p>
         </section>
 
@@ -5588,7 +5684,14 @@ function App() {
                 )}
                 <strong style={styles.salonName}>{salon.name}</strong>
                 {isTopSalon(salon) && <span style={styles.topSalonBadge}>Top Salon</span>}
-                <span style={styles.topSalonBadge}>{professionalTypeLabel(salon.professional_type || "barber")}</span>
+                <span
+                  style={{
+                    ...styles.topSalonBadge,
+                    ...providerTheme(salon.professional_type || "barber").badge
+                  }}
+                >
+                  {professionalTypeLabel(salon.professional_type || "barber")}
+                </span>
                 <span style={styles.salonText}>{salon.address}</span>
                 <span style={styles.salonText}>{salon.phone}</span>
                 <span style={styles.ratingLine}>{"\u2B50"} {ratingText(salon)}</span>
@@ -5941,8 +6044,8 @@ function App() {
                   {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
                     <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
                   )}
-                  <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Barber"}</span>
-                  <span>Salon: {product.salon_id?.name || "Pickup details from barber"}</span>
+                  <span>Service Provider: {product.barber_id?.name || product.barber_id?.phone || "Service Provider"}</span>
+                  <span>Salon: {product.salon_id?.name || "Pickup details from service provider"}</span>
                   {product.distance_km != null && (
                     <span>{product.distance_km} km away</span>
                   )}
@@ -5991,7 +6094,7 @@ function App() {
               {customerProductOrders.map((order) => (
                 <div key={order._id} style={styles.listItem}>
                   <strong>{order.product_id?.name || "Product"}</strong>
-                  <span>Barber: {order.barber_id?.name || order.barber_id?.phone || "Barber"}</span>
+                  <span>Service Provider: {order.barber_id?.name || order.barber_id?.phone || "Service Provider"}</span>
                   <span>Salon: {order.salon_id?.name || "Not linked to a salon"}</span>
                   <span>Quantity: {order.quantity}</span>
                   <span>Total: Rs. {order.total_amount}</span>
@@ -6605,6 +6708,11 @@ const styles = {
     color: "#8a5a00",
     fontWeight: 800,
     fontSize: 13
+  },
+  providerHeroBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    marginTop: 12
   },
   ratingLine: {
     display: "inline-flex",
