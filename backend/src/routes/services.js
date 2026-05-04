@@ -15,7 +15,7 @@ router.get('/salon/:salonId/manage', auth, requireRole('barber'), async (req, re
     }
 
     const services = await Service.find({ salon_id: req.params.salonId })
-      .select('salon_id name description price duration active')
+      .select('salon_id name description service_category price duration active')
       .sort({ price: 1 });
 
     res.json(services);
@@ -27,7 +27,7 @@ router.get('/salon/:salonId/manage', auth, requireRole('barber'), async (req, re
 router.get('/salon/:salonId', async (req, res, next) => {
   try {
     const services = await Service.find({ salon_id: req.params.salonId, active: { $ne: false } })
-      .select('salon_id name description price duration active')
+      .select('salon_id name description service_category price duration active')
       .sort({ price: 1 });
 
     res.json(services);
@@ -66,6 +66,7 @@ router.post('/copy', auth, requireRole('barber'), async (req, res, next) => {
         salon_id: to_salon_id,
         name: service.name,
         description: service.description,
+        service_category: service.service_category,
         price: service.price,
         duration: service.duration,
         active: service.active,
@@ -89,10 +90,14 @@ router.post('/copy', auth, requireRole('barber'), async (req, res, next) => {
 
 router.post('/', auth, requireRole('barber'), async (req, res, next) => {
   try {
-    const { salon_id, name, description, price, duration, active } = req.body;
+    const { salon_id, name, description, service_category, price, duration, active } = req.body;
 
     if (!salon_id || !name || price === undefined || !duration) {
       return res.status(400).json({ message: 'Salon, service name, price, and duration are required' });
+    }
+
+    if (service_category && !['hair', 'beauty', 'makeup'].includes(service_category)) {
+      return res.status(400).json({ message: 'Service category must be hair, beauty, or makeup' });
     }
 
     const salon = await Salon.findOne({ _id: salon_id, owner_id: req.user._id });
@@ -100,7 +105,15 @@ router.post('/', auth, requireRole('barber'), async (req, res, next) => {
       return res.status(404).json({ message: 'Salon not found' });
     }
 
-    const service = await Service.create({ salon_id, name, description, price, duration, active });
+    const service = await Service.create({
+      salon_id,
+      name,
+      description,
+      service_category: service_category || 'hair',
+      price,
+      duration,
+      active,
+    });
     res.status(201).json(service);
   } catch (error) {
     if (error.code === 11000) {
@@ -123,7 +136,11 @@ router.patch('/:id', auth, requireRole('barber'), async (req, res, next) => {
       return res.status(403).json({ message: 'You do not own this service' });
     }
 
-    const allowedFields = ['name', 'description', 'price', 'duration', 'active'];
+    if (req.body.service_category !== undefined && !['hair', 'beauty', 'makeup'].includes(req.body.service_category)) {
+      return res.status(400).json({ message: 'Service category must be hair, beauty, or makeup' });
+    }
+
+    const allowedFields = ['name', 'description', 'service_category', 'price', 'duration', 'active'];
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
         service[field] = req.body[field];

@@ -78,7 +78,8 @@ async function deleteOldSalonPhoto(photoUrl) {
 
 async function attachSalonSummaries(salons) {
   const salonIds = salons.map((salon) => salon._id);
-  const [ratingRows, serviceRows] = await Promise.all([
+  const ownerIds = [...new Set(salons.map((salon) => String(salon.owner_id)).filter(Boolean))];
+  const [ratingRows, serviceRows, owners] = await Promise.all([
     Rating.aggregate([
       { $match: { salon_id: { $in: salonIds } } },
       {
@@ -91,11 +92,21 @@ async function attachSalonSummaries(salons) {
     ]),
     Service.aggregate([
       { $match: { salon_id: { $in: salonIds }, active: { $ne: false } } },
-      { $group: { _id: '$salon_id', services_count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: '$salon_id',
+          services_count: { $sum: 1 },
+          service_categories: { $addToSet: '$service_category' },
+        },
+      },
     ]),
+    ownerIds.length
+      ? require('../models/User').find({ _id: { $in: ownerIds } }).select('professional_type name')
+      : [],
   ]);
   const ratingsBySalon = new Map(ratingRows.map((row) => [String(row._id), row]));
-  const servicesBySalon = new Map(serviceRows.map((row) => [String(row._id), row.services_count]));
+  const servicesBySalon = new Map(serviceRows.map((row) => [String(row._id), row]));
+  const ownersById = new Map(owners.map((owner) => [String(owner._id), owner]));
   const latestRatings = await Rating.find({
     salon_id: { $in: salonIds },
     comment: { $ne: '' },
@@ -125,11 +136,15 @@ async function attachSalonSummaries(salons) {
   return salons.map((salon) => {
     const data = salon.toObject ? salon.toObject() : salon;
     const rating = ratingsBySalon.get(String(data._id));
+    const serviceRow = servicesBySalon.get(String(data._id));
+    const owner = ownersById.get(String(data.owner_id));
     return {
       ...data,
       average_rating: rating ? Number(rating.average_rating.toFixed(1)) : 0,
       rating_count: rating?.rating_count || 0,
-      services_count: servicesBySalon.get(String(data._id)) || 0,
+      services_count: serviceRow?.services_count || 0,
+      service_categories: serviceRow?.service_categories?.filter(Boolean) || [],
+      professional_type: owner?.professional_type || 'barber',
       latest_comments: commentsBySalon.get(String(data._id)) || [],
       recent_reviews: commentsBySalon.get(String(data._id)) || [],
       highest_rated_review: highestBySalon.get(String(data._id)) || null,

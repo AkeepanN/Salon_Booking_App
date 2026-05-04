@@ -12,6 +12,11 @@ const userSchema = new mongoose.Schema(
       enum: ['customer', 'barber', 'admin'],
       required: true,
     },
+    professional_type: {
+      type: String,
+      enum: ['barber', 'beautician', 'makeup_artist'],
+      default: 'barber',
+    },
     active: { type: Boolean, default: true },
     status: {
       type: String,

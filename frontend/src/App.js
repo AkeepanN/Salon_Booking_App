@@ -65,6 +65,62 @@ function roleLabel(role) {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+function professionalTypeLabel(type) {
+  if (type === "beautician") {
+    return "Beautician";
+  }
+
+  if (type === "makeup_artist") {
+    return "Makeup Artist";
+  }
+
+  return "Barber";
+}
+
+function serviceCategoryLabel(category) {
+  if (category === "beauty") {
+    return "Beauty";
+  }
+
+  if (category === "makeup") {
+    return "Makeup";
+  }
+
+  return "Hair";
+}
+
+function productCategoryLabel(category) {
+  const value = String(category || "").trim().toLowerCase();
+
+  if (value === "beauty") {
+    return "Beauty";
+  }
+
+  if (value === "makeup") {
+    return "Makeup";
+  }
+
+  return "Hair";
+}
+
+function productCategoryStyle(category) {
+  const value = String(category || "").trim().toLowerCase();
+
+  if (value === "beauty") {
+    return styles.productBadgeBeauty;
+  }
+
+  if (value === "makeup") {
+    return styles.productBadgeMakeup;
+  }
+
+  return styles.productBadgeHair;
+}
+
+function isProductUnavailable(product) {
+  return Number(product?.stock_quantity || 0) <= 0 || product?.active === false;
+}
+
 function formatDateTime(value) {
   if (!value) {
     return "";
@@ -245,7 +301,8 @@ function App() {
     phone: "",
     email: "",
     password: "",
-    role: "customer"
+    role: "customer",
+    professional_type: "barber"
   });
   const [signupProfilePhoto, setSignupProfilePhoto] = useState(null);
   const [signupProfilePreview, setSignupProfilePreview] = useState("");
@@ -293,7 +350,7 @@ function App() {
   const [boardPhotoFile, setBoardPhotoFile] = useState(null);
   const [boardPhotoPreview, setBoardPhotoPreview] = useState("");
   const [boardPhotoMessage, setBoardPhotoMessage] = useState("");
-  const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "30" });
+  const [serviceForm, setServiceForm] = useState({ name: "", service_category: "hair", price: "", duration: "30" });
   const [productForm, setProductForm] = useState({
     name: "",
     brand: "",
@@ -330,6 +387,7 @@ function App() {
   const [customerProductLocation, setCustomerProductLocation] = useState(null);
   const [shopMessage, setShopMessage] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
+  const [customerServiceTypeFilter, setCustomerServiceTypeFilter] = useState("all");
   const [ratingModalBooking, setRatingModalBooking] = useState(null);
   const [ratingForm, setRatingForm] = useState({ rating: 5, comment: "" });
   const [ratingMessage, setRatingMessage] = useState("");
@@ -379,6 +437,7 @@ function App() {
   const [editServiceForm, setEditServiceForm] = useState({
     name: "",
     description: "",
+    service_category: "hair",
     price: "",
     duration: "30",
     active: true
@@ -517,11 +576,32 @@ function App() {
   const filteredSalons = useMemo(() => {
     const text = search.trim().toLowerCase();
 
-    const filtered = text ? salons.filter((salon) => {
+    let filtered = text ? salons.filter((salon) => {
       const name = salon.name?.toLowerCase() || "";
       const address = salon.address?.toLowerCase() || "";
       return name.includes(text) || address.includes(text);
     }) : salons;
+
+    if (customerServiceTypeFilter !== "all") {
+      filtered = filtered.filter((salon) => {
+        const professionalType = salon.professional_type || "barber";
+        const categories = salon.service_categories || [];
+
+        if (customerServiceTypeFilter === "hair") {
+          return professionalType === "barber" || categories.includes("hair");
+        }
+
+        if (customerServiceTypeFilter === "beauty") {
+          return professionalType === "beautician" || categories.includes("beauty");
+        }
+
+        if (customerServiceTypeFilter === "makeup") {
+          return professionalType === "makeup_artist" || categories.includes("makeup");
+        }
+
+        return true;
+      });
+    }
 
     return [...filtered].sort((a, b) => {
       if (salonSort === "most_reviewed") {
@@ -534,7 +614,15 @@ function App() {
 
       return (b.average_rating || 0) - (a.average_rating || 0) || (b.rating_count || 0) - (a.rating_count || 0);
     });
-  }, [salons, search, salonSort]);
+  }, [customerServiceTypeFilter, salons, search, salonSort]);
+
+  const filteredServices = useMemo(() => {
+    if (customerServiceTypeFilter === "all") {
+      return services;
+    }
+
+    return services.filter((service) => (service.service_category || "hair") === customerServiceTypeFilter);
+  }, [customerServiceTypeFilter, services]);
 
   const selectedService = useMemo(
     () => services.find((service) => service._id === selectedServiceId),
@@ -559,7 +647,11 @@ function App() {
   }, [selectedService, paymentRules]);
 
   const updateAuthField = (field, value) => {
-    setAuthForm((current) => ({ ...current, [field]: value }));
+    setAuthForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "role" && value !== "barber" ? { professional_type: "barber" } : {})
+    }));
     if (field === "role" && value !== "barber") {
       setSignupProfilePhoto(null);
       setSignupProfilePreview("");
@@ -991,7 +1083,8 @@ function App() {
           phone: authForm.phone.trim(),
           email: authForm.email.trim() || undefined,
           password: authForm.password,
-          role: authForm.role
+          role: authForm.role,
+          professional_type: authForm.professional_type
         })
       };
 
@@ -1004,6 +1097,7 @@ function App() {
         }
         formData.append("password", authForm.password);
         formData.append("role", authForm.role);
+        formData.append("professional_type", authForm.professional_type || "barber");
         formData.append("profile_photo", signupProfilePhoto);
         requestOptions.headers = undefined;
         requestOptions.body = formData;
@@ -1756,7 +1850,7 @@ function App() {
     setBoardPhotoFile(null);
     setBoardPhotoPreview("");
     setBoardPhotoMessage("");
-    setServiceForm({ name: "", price: "", duration: "30" });
+    setServiceForm({ name: "", service_category: "hair", price: "", duration: "30" });
     setProductForm({ name: "", brand: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
     setReserveForm({ date: today, start_time: "12:00", end_time: "12:30", reason: "" });
     setReserveMessage("");
@@ -2270,6 +2364,36 @@ function App() {
     }
   };
 
+  const toggleProductActive = async (product, active) => {
+    setLoading(true);
+    setBarberProductMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("active", String(active));
+
+      const res = await fetch(`${API_BASE}/products/${product._id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBarberProductMessage(data.message || "Could not update product");
+        return;
+      }
+
+      setBarberProductMessage("Saved successfully");
+      await loadBarberProducts();
+      await loadProducts();
+    } catch (error) {
+      setBarberProductMessage("Could not connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addService = async (event) => {
     event.preventDefault();
 
@@ -2288,6 +2412,7 @@ function App() {
         body: JSON.stringify({
           salon_id: selectedBarberSalonId,
           name: serviceForm.name.trim(),
+          service_category: serviceForm.service_category,
           price: Number(serviceForm.price),
           duration: Number(serviceForm.duration)
         })
@@ -2299,7 +2424,7 @@ function App() {
         return;
       }
 
-      setServiceForm({ name: "", price: "", duration: "30" });
+      setServiceForm({ name: "", service_category: "hair", price: "", duration: "30" });
       showBarberNotice("success", "Saved successfully");
       await loadBarberServices(selectedBarberSalonId);
       await loadMySalons();
@@ -2315,6 +2440,7 @@ function App() {
     setEditServiceForm({
       name: service.name || "",
       description: service.description || "",
+      service_category: service.service_category || "hair",
       price: service.price ?? "",
       duration: service.duration || "30",
       active: service.active !== false
@@ -2333,6 +2459,7 @@ function App() {
         body: JSON.stringify({
           name: editServiceForm.name.trim(),
           description: editServiceForm.description.trim(),
+          service_category: editServiceForm.service_category,
           price: Number(editServiceForm.price),
           duration: Number(editServiceForm.duration),
           active: editServiceForm.active
@@ -3235,7 +3362,17 @@ function App() {
 
                 {authForm.role === "barber" && (
                   <div style={styles.uploadBox}>
-                    <h3 style={styles.compactTitle}>Barber profile photo</h3>
+                    <label style={styles.label}>Select profession</label>
+                    <select
+                      value={authForm.professional_type}
+                      onChange={(event) => updateAuthField("professional_type", event.target.value)}
+                      style={styles.input}
+                    >
+                      <option value="barber">Barber</option>
+                      <option value="beautician">Beautician</option>
+                      <option value="makeup_artist">Makeup Artist</option>
+                    </select>
+                    <h3 style={styles.compactTitle}>{professionalTypeLabel(authForm.professional_type)} profile photo</h3>
                     {signupProfilePreview ? (
                       <img
                         src={signupProfilePreview}
@@ -3983,6 +4120,7 @@ function App() {
           <p style={styles.heroSubtitle}>
             {selectedBarberSalon ? `Managing ${selectedBarberSalon.name}` : "Select a salon to manage bookings and services."}
           </p>
+          <p style={styles.heroSubtitle}>{professionalTypeLabel(currentUser?.professional_type || "barber")}</p>
         </section>
 
         {barberNotice && (
@@ -4310,23 +4448,49 @@ function App() {
           {barberProducts.length === 0 ? (
             <p style={styles.message}>No products yet</p>
           ) : (
-            <div style={styles.list}>
+            <div style={styles.productGrid}>
               {barberProducts.map((product) => (
-                <div key={product._id} style={styles.listItem}>
-                  {product.image ? (
-                    <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
-                  ) : (
-                    <div style={styles.salonPhotoPlaceholder}>Product image</div>
-                  )}
+                <div
+                  key={product._id}
+                  style={{
+                    ...styles.listItem,
+                    ...styles.productCard,
+                    ...(isProductUnavailable(product) ? styles.productCardUnavailable : {})
+                  }}
+                >
+                  <div style={styles.productMediaWrap}>
+                    <span style={{ ...styles.productBadge, ...productCategoryStyle(product.category) }}>
+                      {productCategoryLabel(product.category)}
+                    </span>
+                    {product.image ? (
+                      <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
+                    ) : (
+                      <div style={styles.salonPhotoPlaceholder}>Product image</div>
+                    )}
+                    {isProductUnavailable(product) && (
+                      <div style={styles.productOverlayLabel}>Out of Stock</div>
+                    )}
+                  </div>
                   <strong>{product.name}</strong>
                   <span>Brand: {product.brand || "Unbranded"}</span>
-                  <span>{product.category || "General"}</span>
                   <span>Rs. {product.price}</span>
-                  <span>Stock: {product.stock_quantity}</span>
+                  <span style={Number(product.stock_quantity) <= 0 ? styles.outOfStockText : undefined}>
+                    {Number(product.stock_quantity) > 0 ? `Stock: ${product.stock_quantity}` : "Out of Stock"}
+                  </span>
+                  {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
+                    <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
+                  )}
                   <span>Salon: {product.salon_id?.name || "Not linked to a salon"}</span>
                   <span>{product.active === false ? "Inactive" : "Active"}</span>
                   <div style={styles.buttonRow}>
                     <button type="button" onClick={() => startEditProduct(product)} style={styles.smallButton}>Edit</button>
+                    <button
+                      type="button"
+                      onClick={() => toggleProductActive(product, product.active === false)}
+                      style={product.active === false ? styles.smallButton : styles.navButton}
+                    >
+                      {product.active === false ? "Activate" : "Deactivate"}
+                    </button>
                     <button type="button" onClick={() => requestDeleteProduct(product)} style={styles.dangerButton}>Delete</button>
                   </div>
                 </div>
@@ -4415,6 +4579,7 @@ function App() {
                         style={{ ...styles.salonCard, ...(selectedBarberSalonId === salon._id ? styles.activeSalonCard : {}) }}
                       >
                         <strong style={styles.salonName}>{salon.name}</strong>
+                        <span style={styles.topSalonBadge}>{professionalTypeLabel(salon.professional_type || "barber")}</span>
                         <span style={styles.salonText}>{salon.address}</span>
                         <span style={styles.salonText}>{salon.phone}</span>
                       </button>
@@ -4460,6 +4625,13 @@ function App() {
                     <label style={styles.label} htmlFor="service-name-modal">Service name</label>
                     <input id="service-name-modal" value={serviceForm.name} onChange={(event) => setServiceForm((current) => ({ ...current, name: event.target.value }))} style={styles.input} />
 
+                    <label style={styles.label} htmlFor="service-category-modal">Service category</label>
+                    <select id="service-category-modal" value={serviceForm.service_category} onChange={(event) => setServiceForm((current) => ({ ...current, service_category: event.target.value }))} style={styles.input}>
+                      <option value="hair">Hair</option>
+                      <option value="beauty">Beauty</option>
+                      <option value="makeup">Makeup</option>
+                    </select>
+
                     <label style={styles.label} htmlFor="service-price-modal">Price</label>
                     <input id="service-price-modal" type="number" value={serviceForm.price} onChange={(event) => setServiceForm((current) => ({ ...current, price: event.target.value }))} style={styles.input} />
 
@@ -4493,6 +4665,12 @@ function App() {
                             <input value={editServiceForm.name} onChange={(event) => setEditServiceForm((current) => ({ ...current, name: event.target.value }))} style={styles.input} />
                             <label style={styles.label}>Description</label>
                             <input value={editServiceForm.description} onChange={(event) => setEditServiceForm((current) => ({ ...current, description: event.target.value }))} style={styles.input} />
+                            <label style={styles.label}>Service category</label>
+                            <select value={editServiceForm.service_category} onChange={(event) => setEditServiceForm((current) => ({ ...current, service_category: event.target.value }))} style={styles.input}>
+                              <option value="hair">Hair</option>
+                              <option value="beauty">Beauty</option>
+                              <option value="makeup">Makeup</option>
+                            </select>
                             <label style={styles.label}>Price</label>
                             <input type="number" value={editServiceForm.price} onChange={(event) => setEditServiceForm((current) => ({ ...current, price: event.target.value }))} style={styles.input} />
                             <label style={styles.label}>Duration minutes</label>
@@ -4509,6 +4687,7 @@ function App() {
                         ) : (
                           <>
                             <strong>{service.name}</strong>
+                            <span>{serviceCategoryLabel(service.service_category || "hair")}</span>
                             <span>{service.description || "No description"}</span>
                             <span>Rs. {service.price} | {service.duration} min</span>
                             <span>{service.active === false ? "Inactive" : "Active"}</span>
@@ -5005,6 +5184,18 @@ function App() {
               style={styles.input}
             />
 
+            <label style={styles.label} htmlFor="service-category">Service category</label>
+            <select
+              id="service-category"
+              value={serviceForm.service_category}
+              onChange={(event) => setServiceForm((current) => ({ ...current, service_category: event.target.value }))}
+              style={styles.input}
+            >
+              <option value="hair">Hair</option>
+              <option value="beauty">Beauty</option>
+              <option value="makeup">Makeup</option>
+            </select>
+
             <label style={styles.label} htmlFor="service-price">Price</label>
             <input
               id="service-price"
@@ -5351,6 +5542,19 @@ function App() {
           <option value="newest">Newest</option>
         </select>
 
+        <label style={styles.label} htmlFor="service-type-filter">Service Type</label>
+        <select
+          id="service-type-filter"
+          value={customerServiceTypeFilter}
+          onChange={(event) => setCustomerServiceTypeFilter(event.target.value)}
+          style={styles.input}
+        >
+          <option value="all">All</option>
+          <option value="hair">Hair</option>
+          <option value="beauty">Beauty</option>
+          <option value="makeup">Makeup</option>
+        </select>
+
         <div style={styles.buttonRow}>
           <button onClick={loadNearbySalons} style={styles.smallButton}>Nearby Salons</button>
           {nearbyMode && <button onClick={loadSalons} style={styles.smallButton}>Show all salons</button>}
@@ -5384,6 +5588,7 @@ function App() {
                 )}
                 <strong style={styles.salonName}>{salon.name}</strong>
                 {isTopSalon(salon) && <span style={styles.topSalonBadge}>Top Salon</span>}
+                <span style={styles.topSalonBadge}>{professionalTypeLabel(salon.professional_type || "barber")}</span>
                 <span style={styles.salonText}>{salon.address}</span>
                 <span style={styles.salonText}>{salon.phone}</span>
                 <span style={styles.ratingLine}>{"\u2B50"} {ratingText(salon)}</span>
@@ -5451,9 +5656,9 @@ function App() {
             style={styles.input}
           >
             <option value="">Choose a service</option>
-            {services.map((service) => (
+            {filteredServices.map((service) => (
               <option key={service._id} value={service._id}>
-                {service.name} - Rs. {service.price} ({service.duration} min)
+                {service.name} - {serviceCategoryLabel(service.service_category || "hair")} - Rs. {service.price} ({service.duration} min)
               </option>
             ))}
           </select>
@@ -5703,20 +5908,39 @@ function App() {
           {customerProducts.length === 0 ? (
             <p style={styles.message}>No products available right now</p>
           ) : (
-            <div style={styles.list}>
+            <div style={styles.productGrid}>
               {customerProducts.map((product) => (
-                <div key={product._id} style={styles.listItem}>
-                  {product.image ? (
-                    <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
-                  ) : (
-                    <div style={styles.salonPhotoPlaceholder}>Product image</div>
-                  )}
+                <div
+                  key={product._id}
+                  style={{
+                    ...styles.listItem,
+                    ...styles.productCard,
+                    ...(isProductUnavailable(product) ? styles.productCardUnavailable : {})
+                  }}
+                >
+                  <div style={styles.productMediaWrap}>
+                    <span style={{ ...styles.productBadge, ...productCategoryStyle(product.category) }}>
+                      {productCategoryLabel(product.category)}
+                    </span>
+                    {product.image ? (
+                      <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
+                    ) : (
+                      <div style={styles.salonPhotoPlaceholder}>Product image</div>
+                    )}
+                    {isProductUnavailable(product) && (
+                      <div style={styles.productOverlayLabel}>Out of Stock</div>
+                    )}
+                  </div>
                   <strong>{product.name}</strong>
                   <span>Brand: {product.brand || "Unbranded"}</span>
-                  <span>{product.category || "General"}</span>
                   <span>{product.description || "Product"}</span>
                   <span>Rs. {product.price}</span>
-                  <span>Stock: {product.stock_quantity}</span>
+                  <span style={Number(product.stock_quantity) <= 0 ? styles.outOfStockText : undefined}>
+                    {Number(product.stock_quantity) > 0 ? `Stock: ${product.stock_quantity}` : "Out of Stock"}
+                  </span>
+                  {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
+                    <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
+                  )}
                   <span>Barber: {product.barber_id?.name || product.barber_id?.phone || "Barber"}</span>
                   <span>Salon: {product.salon_id?.name || "Pickup details from barber"}</span>
                   {product.distance_km != null && (
@@ -5741,10 +5965,10 @@ function App() {
                   <button
                     type="button"
                     onClick={() => placeProductOrder(product)}
-                    disabled={loading || product.active === false || product.stock_quantity < 1}
+                    disabled={loading || isProductUnavailable(product)}
                     style={styles.primaryButton}
                   >
-                    {product.stock_quantity < 1 ? "Out of stock" : "Order for pickup"}
+                    {isProductUnavailable(product) ? "Unavailable" : "Order for pickup"}
                   </button>
                 </div>
               ))}
@@ -6262,6 +6486,12 @@ const styles = {
     gap: 10,
     marginTop: 12
   },
+  productGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 12,
+    marginTop: 12
+  },
   salonCard: {
     display: "grid",
     gap: 4,
@@ -6468,6 +6698,64 @@ const styles = {
     border: "1px solid #d9e1e8",
     borderRadius: 8,
     background: "#f9fbfc"
+  },
+  productCard: {
+    position: "relative",
+    overflow: "hidden",
+    alignContent: "start",
+    minHeight: "100%"
+  },
+  productCardUnavailable: {
+    opacity: 0.62,
+    filter: "grayscale(0.25)"
+  },
+  productMediaWrap: {
+    position: "relative"
+  },
+  productBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "4px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800,
+    boxShadow: "0 6px 16px rgba(23, 32, 38, 0.14)"
+  },
+  productBadgeHair: {
+    background: "#eaf2ff",
+    color: "#1d4ed8"
+  },
+  productBadgeBeauty: {
+    background: "#ffe8f3",
+    color: "#be185d"
+  },
+  productBadgeMakeup: {
+    background: "#f1e8ff",
+    color: "#7c3aed"
+  },
+  productOverlayLabel: {
+    position: "absolute",
+    inset: 0,
+    display: "grid",
+    placeItems: "center",
+    borderRadius: 6,
+    background: "rgba(15, 23, 42, 0.38)",
+    color: "#ffffff",
+    fontWeight: 800,
+    letterSpacing: 0.2
+  },
+  lowStockText: {
+    color: "#c2410c",
+    fontWeight: 700
+  },
+  outOfStockText: {
+    color: "#b42318",
+    fontWeight: 800
   },
   tabRow: {
     display: "grid",

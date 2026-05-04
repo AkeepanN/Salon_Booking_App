@@ -45,13 +45,14 @@ function publicUser(user) {
     phone: user.phone,
     email: user.email,
     role: user.role,
+    professional_type: user.professional_type,
     profilePhotoUrl: user.profilePhotoUrl,
   };
 }
 
 router.post('/signup', uploadProfilePhoto.single('profile_photo'), async (req, res, next) => {
   try {
-    const { name, phone, email, password, role } = req.body;
+    const { name, phone, email, password, role, professional_type } = req.body;
 
     if (!name || !phone || !password || !['customer', 'barber'].includes(role)) {
       if (req.file) {
@@ -71,6 +72,7 @@ router.post('/signup', uploadProfilePhoto.single('profile_photo'), async (req, r
       email,
       passwordHash,
       role,
+      professional_type: role === 'barber' ? (professional_type || 'barber') : 'barber',
       profilePhotoUrl: req.file ? `/uploads/users/${req.file.filename}` : '',
     });
 
