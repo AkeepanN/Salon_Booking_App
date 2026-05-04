@@ -187,6 +187,8 @@ router.get('/', async (req, res, next) => {
           ? req.query.service_type.trim()
           : '';
 
+    console.log('GET /api/salons query:', req.query);
+
     const query = {
       active: { $ne: false },
       status: { $nin: ['blocked', 'deleted'] },
@@ -267,6 +269,15 @@ router.get('/nearby', async (req, res, next) => {
       ));
 
     res.json(sorted);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/mine', auth, requireRole('barber'), async (req, res, next) => {
+  try {
+    const salons = await Salon.find({ owner_id: req.user._id }).sort({ createdAt: -1 });
+    res.json(await attachSalonSummaries(salons));
   } catch (error) {
     next(error);
   }
@@ -727,15 +738,6 @@ router.patch('/:id/working-hours', auth, requireRole('barber'), async (req, res,
     }
 
     res.json(salon);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/mine', auth, requireRole('barber'), async (req, res, next) => {
-  try {
-    const salons = await Salon.find({ owner_id: req.user._id }).sort({ createdAt: -1 });
-    res.json(await attachSalonSummaries(salons));
   } catch (error) {
     next(error);
   }

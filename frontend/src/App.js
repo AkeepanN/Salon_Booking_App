@@ -670,6 +670,9 @@ function App() {
       filtered = filtered.filter((salon) => {
         const professionalType = salon.professional_type || "barber";
         const categories = salon.service_categories || [];
+        if (categories.length === 0) {
+          return true;
+        }
 
         if (customerServiceTypeFilter === "hair") {
           return professionalType === "barber" || categories.includes("hair");
@@ -1300,7 +1303,9 @@ function App() {
     setMessage("");
 
     try {
-      const res = await fetch(`${API_BASE}/salons`);
+      const url = `${API_BASE}/salons`;
+      console.log("Salon request URL:", url);
+      const res = await fetch(url);
       const data = await res.json().catch(() => []);
       console.log("Loaded salons:", Array.isArray(data) ? data : []);
 
@@ -1417,7 +1422,9 @@ function App() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const res = await fetch(`${API_BASE}/salons/nearby?lat=${latitude}&lng=${longitude}`);
+          const url = `${API_BASE}/salons/nearby?lat=${latitude}&lng=${longitude}`;
+          console.log("Salon request URL:", url);
+          const res = await fetch(url);
           const data = await res.json().catch(() => []);
 
           if (!res.ok) {
