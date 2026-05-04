@@ -1302,14 +1302,14 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/salons`);
       const data = await res.json().catch(() => []);
-      console.log("Loaded salons:", data);
+      console.log("Loaded salons:", Array.isArray(data) ? data : []);
 
       if (!res.ok) {
         setMessage(data.message || "Could not load salons");
         return;
       }
 
-      setSalons(data);
+      setSalons(Array.isArray(data) ? data : []);
       setNearbyMode(false);
     } catch (error) {
       setMessage("Could not connect to the server");
