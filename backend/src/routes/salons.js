@@ -172,16 +172,30 @@ function distanceKm(lat1, lng1, lat2, lng2) {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const allowedProfessionalTypes = new Set(['barber', 'beautician', 'makeup_artist']);
+const allowedServiceCategories = new Set(['hair', 'beauty', 'makeup']);
+
 router.get('/', async (req, res, next) => {
   try {
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const professionalType =
+      typeof req.query.professional_type === 'string' ? req.query.professional_type.trim() : '';
+    const serviceCategory =
+      typeof req.query.service_category === 'string'
+        ? req.query.service_category.trim()
+        : typeof req.query.service_type === 'string'
+          ? req.query.service_type.trim()
+          : '';
+
     const query = {
       active: { $ne: false },
       status: { $nin: ['blocked', 'deleted'] },
       approval_status: { $ne: 'rejected' },
     };
 
-    if (req.query.search) {
-      query.$text = { $search: req.query.search };
+    if (search) {
+      const pattern = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query.$or = [{ name: pattern }, { address: pattern }];
     }
 
     const salons = await Salon.find(query)
@@ -189,7 +203,33 @@ router.get('/', async (req, res, next) => {
       .sort({ name: 1 })
       .limit(50);
 
-    const withSummaries = await attachSalonSummaries(salons);
+    let withSummaries = await attachSalonSummaries(salons);
+
+    if (allowedProfessionalTypes.has(professionalType)) {
+      withSummaries = withSummaries.filter((salon) => (salon.professional_type || 'barber') === professionalType);
+    }
+
+    if (allowedServiceCategories.has(serviceCategory)) {
+      withSummaries = withSummaries.filter((salon) => {
+        const categories = salon.service_categories || [];
+        const type = salon.professional_type || 'barber';
+
+        if (serviceCategory === 'hair') {
+          return type === 'barber' || categories.includes('hair');
+        }
+
+        if (serviceCategory === 'beauty') {
+          return type === 'beautician' || categories.includes('beauty');
+        }
+
+        if (serviceCategory === 'makeup') {
+          return type === 'makeup_artist' || categories.includes('makeup');
+        }
+
+        return true;
+      });
+    }
+
     console.log('GET /api/salons returning:', withSummaries.length);
     res.json(sortByRating(withSummaries));
   } catch (error) {

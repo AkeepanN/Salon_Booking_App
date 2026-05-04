@@ -127,8 +127,8 @@ router.get('/', async (req, res, next) => {
       }
 
       return product.salon_id.active !== false &&
-        (product.salon_id.status === 'active' || product.salon_id.status === undefined) &&
-        product.salon_id.approval_status === 'approved';
+        !['blocked', 'deleted'].includes(product.salon_id.status) &&
+        product.salon_id.approval_status !== 'rejected';
     });
 
     let response = activeProducts.map(normalizeProduct);
@@ -181,22 +181,6 @@ router.get('/mine', auth, requireRole('barber'), async (req, res, next) => {
       .sort({ createdAt: -1 });
 
     res.json(products.map(normalizeProduct));
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/:id', async (req, res, next) => {
-  try {
-    const product = await Product.findOne({ _id: req.params.id, active: true, stock_quantity: { $gt: 0 } })
-      .populate('barber_id', 'name phone')
-      .populate('salon_id', 'name address phone');
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    res.json(normalizeProduct(product));
   } catch (error) {
     next(error);
   }
@@ -384,6 +368,22 @@ router.delete('/:id', auth, requireRole('barber'), async (req, res, next) => {
     await product.save();
 
     res.json({ message: 'Product deactivated', product });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, active: true, stock_quantity: { $gt: 0 } })
+      .populate('barber_id', 'name phone')
+      .populate('salon_id', 'name address phone');
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json(normalizeProduct(product));
   } catch (error) {
     next(error);
   }

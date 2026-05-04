@@ -36,8 +36,8 @@ router.post('/', auth, requireRole('customer'), async (req, res, next) => {
       const salon = await Salon.findOne({
         _id: product.salon_id,
         active: { $ne: false },
-        $or: [{ status: 'active' }, { status: { $exists: false } }],
-        approval_status: 'approved',
+        status: { $nin: ['blocked', 'deleted'] },
+        approval_status: { $ne: 'rejected' },
       });
 
       if (!salon) {

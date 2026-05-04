@@ -39,8 +39,8 @@ async function loadBookingContext({ salonId, serviceId }) {
     Salon.findOne({
       _id: salonId,
       active: { $ne: false },
-      $or: [{ status: 'active' }, { status: { $exists: false } }],
-      approval_status: 'approved',
+      status: { $nin: ['blocked', 'deleted'] },
+      approval_status: { $ne: 'rejected' },
     }),
     Service.findOne({ _id: serviceId, salon_id: salonId }),
   ]);
