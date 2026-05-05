@@ -9,7 +9,23 @@ import {
   YAxis
 } from "recharts";
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+function resolveApiBaseUrl() {
+  const envUrl = (process.env.REACT_APP_API_URL || "").trim().replace(/\/+$/, "");
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+
+  if (isLocalHost) {
+    return envUrl && !/railway\.app/i.test(envUrl) ? envUrl : "http://localhost:5000";
+  }
+
+  if (envUrl && !/localhost|127\.0\.0\.1/i.test(envUrl)) {
+    return envUrl;
+  }
+
+  return "https://salonbookingapp-env.up.railway.app";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const API_BASE = `${API_BASE_URL}/api`;
 const API_ORIGIN = API_BASE_URL;
 console.log("Final API base URL:", API_BASE_URL);
