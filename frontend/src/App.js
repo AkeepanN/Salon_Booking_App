@@ -15,10 +15,10 @@ function resolveApiBaseUrl() {
   const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
 
   if (isLocalHost) {
-    return envUrl && !/railway\.app/i.test(envUrl) ? envUrl : "http://localhost:5000";
+    return envUrl || "http://localhost:5000";
   }
 
-  if (envUrl && !/localhost|127\.0\.0\.1/i.test(envUrl)) {
+  if (envUrl) {
     return envUrl;
   }
 
@@ -1546,13 +1546,13 @@ function App() {
       console.log("Login response:", { ok: res.ok, status: res.status, data });
 
       if (!res.ok) {
-        setMessage(data.message || "Login failed");
+        setMessage(data.message || data.error || "Login failed");
         return;
       }
 
       saveSession(data);
     } catch (error) {
-      setMessage("Could not connect to the server");
+      setMessage(error.message || "Could not connect to the server");
     } finally {
       setLoading(false);
     }
@@ -1611,7 +1611,7 @@ function App() {
       console.log("Signup response:", { ok: res.ok, status: res.status, data });
 
       if (!res.ok) {
-        setMessage(data.message || "Signup failed");
+        setMessage(data.message || data.error || "Signup failed");
         return;
       }
 
@@ -1619,7 +1619,7 @@ function App() {
       setSignupProfilePhoto(null);
       setSignupProfilePreview("");
     } catch (error) {
-      setMessage("Could not connect to the server");
+      setMessage(error.message || "Could not connect to the server");
     } finally {
       setLoading(false);
     }
