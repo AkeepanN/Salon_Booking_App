@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,12 +12,10 @@ import {
 const API_BASE_URL = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 const API_BASE = `${API_BASE_URL}/api`;
 const API_ORIGIN = API_BASE_URL;
-console.log("Final API base URL:", API_BASE_URL);
 const now = new Date();
 const today = now.toISOString().slice(0, 10);
 const currentMonth = now.getMonth() + 1;
 const currentYear = now.getFullYear();
-const DEFAULT_IMAGE_POSITION = { x: 50, y: 50, zoom: 1 };
 
 function imageUrl(path) {
   if (!path) {
@@ -215,205 +213,6 @@ function ratingText(salon) {
   return count ? `${average.toFixed(1)} (${count} reviews)` : "No ratings yet";
 }
 
-function renderStars(rating) {
-  const value = Number(rating || 0);
-  if (!value) {
-    return "No ratings yet";
-  }
-
-  const fullStars = Math.max(0, Math.min(5, Math.round(value)));
-  return `${"★".repeat(fullStars)}${"☆".repeat(5 - fullStars)}`;
-}
-
-function formatDistance(distance) {
-  if (distance == null || Number.isNaN(Number(distance))) {
-    return "";
-  }
-
-  return `${Number(distance).toFixed(1)} km away`;
-}
-
-function normalizeImagePosition(input) {
-  return {
-    x: Math.max(0, Math.min(100, Number(input?.x ?? DEFAULT_IMAGE_POSITION.x))),
-    y: Math.max(0, Math.min(100, Number(input?.y ?? DEFAULT_IMAGE_POSITION.y))),
-    zoom: Math.max(1, Math.min(3, Number(input?.zoom ?? DEFAULT_IMAGE_POSITION.zoom))),
-  };
-}
-
-function getPositionedImageStyle(baseStyle, imagePosition) {
-  const position = normalizeImagePosition(imagePosition);
-  return {
-    ...baseStyle,
-    objectFit: "cover",
-    objectPosition: `${position.x}% ${position.y}%`,
-    transform: `scale(${position.zoom})`,
-    transformOrigin: `${position.x}% ${position.y}%`,
-  };
-}
-
-function DetailsModal({ open, title, onClose, children, wide = false }) {
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [open, onClose]);
-
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <div
-      className="details-modal-backdrop"
-      style={styles.modalBackdrop}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <section
-        className="details-modal"
-        style={{ ...styles.modalCard, ...(wide ? styles.wideModalCard : {}) }}
-      >
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>{title}</h2>
-          <button
-            type="button"
-            className="details-modal-close"
-            onClick={onClose}
-            style={styles.smallButton}
-          >
-            Close
-          </button>
-        </div>
-        {children}
-      </section>
-    </div>
-  );
-}
-
-function ImagePositionEditor({
-  imageSrc,
-  position,
-  onChange,
-  emptyLabel,
-}) {
-  const frameRef = useRef(null);
-  const dragRef = useRef(null);
-  const normalized = normalizeImagePosition(position);
-
-  const startDrag = (clientX, clientY) => {
-    dragRef.current = {
-      clientX,
-      clientY,
-      x: normalized.x,
-      y: normalized.y,
-    };
-  };
-
-  const moveDrag = (clientX, clientY) => {
-    if (!dragRef.current || !frameRef.current) {
-      return;
-    }
-
-    const rect = frameRef.current.getBoundingClientRect();
-    const deltaX = ((clientX - dragRef.current.clientX) / rect.width) * 100;
-    const deltaY = ((clientY - dragRef.current.clientY) / rect.height) * 100;
-
-    onChange({
-      ...normalized,
-      x: Math.max(0, Math.min(100, dragRef.current.x + deltaX)),
-      y: Math.max(0, Math.min(100, dragRef.current.y + deltaY)),
-    });
-  };
-
-  const endDrag = () => {
-    dragRef.current = null;
-  };
-
-  return (
-    <div className="image-position-editor" style={styles.imagePositionEditor}>
-      <div
-        ref={frameRef}
-        className="image-editor-frame"
-        style={styles.imageEditorFrame}
-        onMouseDown={(event) => {
-          if (!imageSrc) {
-            return;
-          }
-          event.preventDefault();
-          startDrag(event.clientX, event.clientY);
-        }}
-        onMouseMove={(event) => moveDrag(event.clientX, event.clientY)}
-        onMouseUp={endDrag}
-        onMouseLeave={endDrag}
-        onTouchStart={(event) => {
-          if (!imageSrc) {
-            return;
-          }
-          const touch = event.touches[0];
-          if (!touch) {
-            return;
-          }
-          startDrag(touch.clientX, touch.clientY);
-        }}
-        onTouchMove={(event) => {
-          const touch = event.touches[0];
-          if (!touch) {
-            return;
-          }
-          moveDrag(touch.clientX, touch.clientY);
-        }}
-        onTouchEnd={endDrag}
-      >
-        {imageSrc ? (
-          <img
-            src={imageSrc}
-            alt=""
-            className="image-editor-img"
-            draggable={false}
-            style={getPositionedImageStyle(styles.imageEditorImg, normalized)}
-          />
-        ) : (
-          <div style={styles.boardPhotoPlaceholder}>{emptyLabel}</div>
-        )}
-      </div>
-      <div className="position-controls" style={styles.positionControls}>
-        <label style={{ ...styles.label, margin: 0 }}>
-          Zoom
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.05"
-            value={normalized.zoom}
-            onChange={(event) => onChange({ ...normalized, zoom: Number(event.target.value) })}
-            style={styles.rangeInput}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => onChange(DEFAULT_IMAGE_POSITION)}
-          style={styles.smallButton}
-        >
-          Reset view
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const monthOptions = [
   ["1", "January"],
   ["2", "February"],
@@ -428,6 +227,10 @@ const monthOptions = [
   ["11", "November"],
   ["12", "December"],
 ];
+
+function isTopSalon(salon) {
+  return Number(salon?.average_rating || 0) >= 4.5 && Number(salon?.rating_count || 0) >= 10;
+}
 
 function StatusBadge({ status }) {
   const style = {
@@ -582,22 +385,14 @@ function App() {
   });
   const [signupProfilePhoto, setSignupProfilePhoto] = useState(null);
   const [signupProfilePreview, setSignupProfilePreview] = useState("");
-  const [profileForm, setProfileForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    profilePhotoUrl: ""
-  });
-  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState("");
-  const [profileNotice, setProfileNotice] = useState(null);
   const [salons, setSalons] = useState([]);
   const [salonSort, setSalonSort] = useState("top_rated");
   const [services, setServices] = useState([]);
   const [slots, setSlots] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedSalon, setSelectedSalon] = useState(null);
+  const [salonReviews, setSalonReviews] = useState([]);
+  const [reviewsSalonId, setReviewsSalonId] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [date, setDate] = useState(today);
   const [loading, setLoading] = useState(false);
@@ -633,7 +428,6 @@ function App() {
   const [salonForm, setSalonForm] = useState({ name: "", address: "", phone: "", latitude: "", longitude: "" });
   const [boardPhotoFile, setBoardPhotoFile] = useState(null);
   const [boardPhotoPreview, setBoardPhotoPreview] = useState("");
-  const [boardPhotoPosition, setBoardPhotoPosition] = useState(DEFAULT_IMAGE_POSITION);
   const [boardPhotoMessage, setBoardPhotoMessage] = useState("");
   const [serviceForm, setServiceForm] = useState({ name: "", service_category: "hair", price: "", duration: "30" });
   const [productForm, setProductForm] = useState({
@@ -648,7 +442,6 @@ function App() {
   });
   const [productImageFile, setProductImageFile] = useState(null);
   const [productImagePreview, setProductImagePreview] = useState("");
-  const [productImagePosition, setProductImagePosition] = useState(DEFAULT_IMAGE_POSITION);
   const [editingProductId, setEditingProductId] = useState("");
   const [barberProducts, setBarberProducts] = useState([]);
   const [barberProductOrders, setBarberProductOrders] = useState([]);
@@ -668,19 +461,16 @@ function App() {
   const [customerProductOrders, setCustomerProductOrders] = useState([]);
   const [productOrderQuantities, setProductOrderQuantities] = useState({});
   const [productSearch, setProductSearch] = useState("");
-  const [productBrandFilter, setProductBrandFilter] = useState("");
   const [productSalonFilter, setProductSalonFilter] = useState("");
   const [productListingMode, setProductListingMode] = useState("salon");
-  const [productSort, setProductSort] = useState("distance");
   const [customerProductLocation, setCustomerProductLocation] = useState(null);
   const [shopMessage, setShopMessage] = useState("");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [customerServiceTypeFilter, setCustomerServiceTypeFilter] = useState("all");
-  const [salonDetailsOpen, setSalonDetailsOpen] = useState(false);
-  const [selectedCosmetic, setSelectedCosmetic] = useState(null);
   const [ratingModalBooking, setRatingModalBooking] = useState(null);
   const [ratingForm, setRatingForm] = useState({ rating: 5, comment: "" });
   const [ratingMessage, setRatingMessage] = useState("");
+  const [nearbyMode, setNearbyMode] = useState(false);
   const [workingHoursForm, setWorkingHoursForm] = useState({
     open: "09:00",
     close: "18:00",
@@ -742,10 +532,6 @@ function App() {
     () => barberSalons.find((salon) => salon._id === selectedBarberSalonId),
     [barberSalons, selectedBarberSalonId]
   );
-  const boardPhotoSource = boardPhotoPreview || imageUrl(selectedBarberSalon?.board_photo_url);
-  const productPreviewSource = productImagePreview || imageUrl(
-    barberProducts.find((product) => product._id === editingProductId)?.image
-  );
   const barberInitials = useMemo(() => {
     const name = currentUser?.name || "Service Provider";
     return name
@@ -780,63 +566,6 @@ function App() {
       .map((part) => part[0]?.toUpperCase())
       .join("") || "C";
   }, [currentUser]);
-  const renderProfileEditor = (titlePrefix = "Profile") => (
-    <form onSubmit={saveProfile} style={styles.uploadBox}>
-      <div style={styles.profileHeader}>
-        {profilePhotoPreview ? (
-          <img src={profilePhotoPreview} alt="Profile" style={styles.profilePhotoPreview} />
-        ) : (
-          <div style={styles.profilePhotoPlaceholder}>Profile photo</div>
-        )}
-        <div style={styles.profileHeaderText}>
-          <strong>{titlePrefix}</strong>
-          <span>{currentUser?.name || "User"}</span>
-          <span>{currentUser?.role === "barber" ? `Service Provider (${providerLabel})` : currentUser?.role || "User"}</span>
-        </div>
-      </div>
-      {profileNotice && (
-        <div style={profileNotice.type === "success" ? styles.successCard : styles.errorCard}>
-          {profileNotice.text}
-        </div>
-      )}
-      <label style={styles.label}>Name</label>
-      <input
-        value={profileForm.name}
-        onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
-        style={styles.input}
-      />
-      <label style={styles.label}>Mobile number</label>
-      <input
-        type="tel"
-        value={profileForm.phone}
-        onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))}
-        style={styles.input}
-      />
-      <label style={styles.label}>Email</label>
-      <input
-        type="email"
-        value={profileForm.email}
-        onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))}
-        style={styles.input}
-      />
-      <label style={styles.label}>Address / location</label>
-      <input
-        value={profileForm.address}
-        onChange={(event) => setProfileForm((current) => ({ ...current, address: event.target.value }))}
-        style={styles.input}
-      />
-      <label style={styles.label}>Profile photo</label>
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        onChange={handleProfilePhotoChange}
-        style={styles.input}
-      />
-      <button type="submit" disabled={loading} style={styles.primaryButton}>
-        {loading ? "Saving..." : "Save profile"}
-      </button>
-    </form>
-  );
   const customerBookingTabs = useMemo(() => {
     return {
       confirmed: sortBookingsForTab(customerBookings.filter((booking) => booking.status === "confirmed"), "confirmed"),
@@ -860,31 +589,6 @@ function App() {
 
     return [...byId.values()].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
   }, [salons, customerProducts]);
-  const productBrandOptions = useMemo(
-    () => [...new Set(customerProducts.map((product) => product.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [customerProducts]
-  );
-  const filteredCustomerProducts = useMemo(() => {
-    let items = [...customerProducts];
-
-    if (productBrandFilter) {
-      items = items.filter((product) => product.brand === productBrandFilter);
-    }
-
-    if (productSort === "price_low") {
-      items.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-    } else if (productSort === "price_high") {
-      items.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-    } else if (productSort === "distance") {
-      items.sort((a, b) => {
-        const aDistance = a.distance_km == null ? Number.POSITIVE_INFINITY : Number(a.distance_km);
-        const bDistance = b.distance_km == null ? Number.POSITIVE_INFINITY : Number(b.distance_km);
-        return aDistance - bDistance;
-      });
-    }
-
-    return items;
-  }, [customerProducts, productBrandFilter, productSort]);
   const adminUserTabs = useMemo(() => ({
     active: adminUsers.filter((user) => (user.status || (user.active === false ? "blocked" : "active")) === "active"),
     blocked: adminUsers.filter((user) => (user.status || "") === "blocked"),
@@ -906,7 +610,6 @@ function App() {
   useEffect(() => {
     if (isLoggedIn) {
       loadNotifications();
-      loadMyProfile();
     }
     if (isLoggedIn && role === "customer") {
       loadSalons();
@@ -925,21 +628,6 @@ function App() {
     // Run only when the auth state changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, role]);
-
-  useEffect(() => {
-    if (!boardPhotoFile) {
-      setBoardPhotoPosition(normalizeImagePosition(selectedBarberSalon?.imagePosition));
-    }
-  }, [boardPhotoFile, selectedBarberSalon]);
-
-  useEffect(() => {
-    if (!productImageFile && editingProductId) {
-      const product = barberProducts.find((item) => item._id === editingProductId);
-      if (product) {
-        setProductImagePosition(normalizeImagePosition(product.imagePosition));
-      }
-    }
-  }, [barberProducts, editingProductId, productImageFile]);
 
   useEffect(() => {
     if (!barberNotice) {
@@ -986,15 +674,15 @@ function App() {
           return true;
         }
 
-        if (customerServiceTypeFilter === "barber") {
+        if (customerServiceTypeFilter === "hair") {
           return professionalType === "barber" || categories.includes("hair");
         }
 
-        if (customerServiceTypeFilter === "beautician") {
+        if (customerServiceTypeFilter === "beauty") {
           return professionalType === "beautician" || categories.includes("beauty");
         }
 
-        if (customerServiceTypeFilter === "makeup_artist") {
+        if (customerServiceTypeFilter === "makeup") {
           return professionalType === "makeup_artist" || categories.includes("makeup");
         }
 
@@ -1003,12 +691,6 @@ function App() {
     }
 
     return [...filtered].sort((a, b) => {
-      if (salonSort === "nearest") {
-        const aDistance = a.distance_km == null ? Number.POSITIVE_INFINITY : Number(a.distance_km);
-        const bDistance = b.distance_km == null ? Number.POSITIVE_INFINITY : Number(b.distance_km);
-        return aDistance - bDistance;
-      }
-
       if (salonSort === "most_reviewed") {
         return (b.rating_count || 0) - (a.rating_count || 0) || (b.average_rating || 0) - (a.average_rating || 0);
       }
@@ -1026,13 +708,7 @@ function App() {
       return services;
     }
 
-    const categoryMap = {
-      barber: "hair",
-      beautician: "beauty",
-      makeup_artist: "makeup"
-    };
-
-    return services.filter((service) => (service.service_category || "hair") === categoryMap[customerServiceTypeFilter]);
+    return services.filter((service) => (service.service_category || "hair") === customerServiceTypeFilter);
   }, [customerServiceTypeFilter, services]);
 
   const selectedService = useMemo(
@@ -1116,64 +792,12 @@ function App() {
     setSignupProfilePreview(URL.createObjectURL(file));
   };
 
-  const handleProfilePhotoChange = (event) => {
-    const file = event.target.files?.[0];
-    setProfileNotice(null);
-
-    if (!file) {
-      setProfilePhotoFile(null);
-      setProfilePhotoPreview(imageUrl(profileForm.profilePhotoUrl || currentUser?.profilePhotoUrl || currentUser?.profile_photo_url || ""));
-      return;
-    }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setProfilePhotoFile(null);
-      setProfileNotice({ type: "error", text: "Only jpg, jpeg, png, and webp images are allowed" });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setProfilePhotoFile(null);
-      setProfileNotice({ type: "error", text: "Image must be 5MB or smaller" });
-      return;
-    }
-
-    setProfilePhotoFile(file);
-    setProfilePhotoPreview(URL.createObjectURL(file));
-  };
-
   const showBarberNotice = (type, text) => {
     setBarberNotice({ type, text });
   };
 
-  const hydrateProfileForm = (user = currentUser) => {
-    setProfileForm({
-      name: user?.name || "",
-      phone: user?.phone || "",
-      email: user?.email || "",
-      address: user?.address || "",
-      profilePhotoUrl: user?.profilePhotoUrl || user?.profile_photo_url || ""
-    });
-    setProfilePhotoFile(null);
-    setProfilePhotoPreview(imageUrl(user?.profilePhotoUrl || user?.profile_photo_url || ""));
-  };
-
-  const setStoredUser = (user) => {
-    localStorage.setItem("user", JSON.stringify(user));
-    if (user?.role) {
-      localStorage.setItem("role", user.role);
-      setRole(user.role);
-    }
-    setCurrentUser(user);
-  };
-
   const openBarberModal = (modalName) => {
     setBarberMenuOpen(false);
-    if (modalName === "profile") {
-      hydrateProfileForm();
-      setProfileNotice(null);
-    }
     setBarberModal(modalName);
     clearBarberFeedback();
   };
@@ -1185,7 +809,6 @@ function App() {
     setWorkingHoursMessage("");
     setReserveMessage("");
     setBarberProductMessage("");
-    setProfileNotice(null);
   };
 
   const clearBarberFeedback = () => {
@@ -1478,30 +1101,12 @@ function App() {
 
   const saveSession = (data) => {
     localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    localStorage.setItem("role", data.user.role);
     setToken(data.token);
-    setStoredUser(data.user);
-    hydrateProfileForm(data.user);
+    setRole(data.user.role);
+    setCurrentUser(data.user);
     setMessage("");
-  };
-
-  const loadMyProfile = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/profile/me`, {
-        headers: authHeaders()
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        return;
-      }
-
-      if (data.user) {
-        setStoredUser(data.user);
-        hydrateProfileForm(data.user);
-      }
-    } catch (error) {
-      // Keep the stored user if the profile refresh fails.
-    }
   };
 
   const login = async (event) => {
@@ -1516,9 +1121,7 @@ function App() {
     }
 
     try {
-      const loginUrl = `${API_BASE}/auth/login`;
-      console.log("Login request URL:", loginUrl);
-      const res = await fetch(loginUrl, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1527,7 +1130,6 @@ function App() {
         })
       });
       const data = await res.json().catch(() => ({}));
-      console.log("Login response:", { ok: res.ok, status: res.status, data });
 
       if (!res.ok) {
         setMessage(data.message || "Login failed");
@@ -1588,11 +1190,8 @@ function App() {
         requestOptions.body = formData;
       }
 
-      const signupUrl = `${API_BASE}/auth/signup`;
-      console.log("Signup request URL:", signupUrl);
-      const res = await fetch(signupUrl, requestOptions);
+      const res = await fetch(`${API_BASE}/auth/signup`, requestOptions);
       const data = await res.json().catch(() => ({}));
-      console.log("Signup response:", { ok: res.ok, status: res.status, data });
 
       if (!res.ok) {
         setMessage(data.message || "Signup failed");
@@ -1616,10 +1215,6 @@ function App() {
     setToken("");
     setRole("");
     setCurrentUser({});
-    setProfileForm({ name: "", phone: "", email: "", address: "", profilePhotoUrl: "" });
-    setProfilePhotoFile(null);
-    setProfilePhotoPreview("");
-    setProfileNotice(null);
     setSignupProfilePhoto(null);
     setSignupProfilePreview("");
     setSalons([]);
@@ -1632,6 +1227,7 @@ function App() {
     setBookingSuccess(null);
     setBookingToCancel(null);
     setCancelBookingMessage("");
+    setNearbyMode(false);
     setBarberSalons([]);
     setSelectedBarberSalonId("");
     setBarberServices([]);
@@ -1719,6 +1315,7 @@ function App() {
       }
 
       setSalons(Array.isArray(data) ? data : []);
+      setNearbyMode(false);
     } catch (error) {
       setMessage("Could not connect to the server");
     } finally {
@@ -1751,7 +1348,7 @@ function App() {
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
-      setShopMessage(data.message || data.error || "Could not load cosmetics");
+        setShopMessage(data.message || "Could not load products");
         return;
       }
 
@@ -1785,7 +1382,7 @@ function App() {
           await loadProducts({ mode: "nearby", location });
         },
         async () => {
-          setShopMessage("Location permission denied. Showing normal cosmetics list.");
+          setShopMessage("Location permission denied. Showing normal product list.");
           await loadProducts({ mode: "salon", location: null });
         }
       );
@@ -1793,27 +1390,6 @@ function App() {
     }
 
     await loadProducts({ mode: "salon", location: null });
-  };
-
-  const clearSalonFilters = async () => {
-    setSearch("");
-    setSalonSort("top_rated");
-    setCustomerServiceTypeFilter("all");
-    setSelectedSalon(null);
-    setSelectedServiceId("");
-    setServices([]);
-    setSlots([]);
-    await loadSalons();
-  };
-
-  const clearProductFilters = async () => {
-    setProductSearch("");
-    setProductBrandFilter("");
-    setProductSalonFilter("");
-    setProductListingMode("salon");
-    setProductSort("distance");
-    setCustomerProductLocation(null);
-    await loadProducts({ search: "", salonId: "", mode: "salon", location: null });
   };
 
   const loadPaymentRules = async () => {
@@ -1857,6 +1433,7 @@ function App() {
           }
 
           setSalons(data);
+          setNearbyMode(true);
         } catch (error) {
           setMessage("Could not connect to the server");
         } finally {
@@ -1865,63 +1442,15 @@ function App() {
       },
       () => {
         setLoading(false);
-        setMessage("Please allow location access to find nearby salons");
+        setMessage("Could not get your location");
       }
     );
   };
 
-  const saveProfile = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setProfileNotice(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("name", profileForm.name.trim());
-      formData.append("phone", profileForm.phone.trim());
-      formData.append("email", profileForm.email.trim());
-      formData.append("address", profileForm.address.trim());
-      if (profilePhotoFile) {
-        formData.append("profile_photo", profilePhotoFile);
-      } else if (profileForm.profilePhotoUrl.trim()) {
-        formData.append("profilePhotoUrl", profileForm.profilePhotoUrl.trim());
-      }
-
-      const res = await fetch(`${API_BASE}/profile/me`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || token}`
-        },
-        body: formData
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setProfileNotice({ type: "error", text: data.message || data.error || "Could not update profile" });
-        return;
-      }
-
-      if (data.user) {
-        setStoredUser(data.user);
-        hydrateProfileForm(data.user);
-      }
-
-      setProfileNotice({ type: "success", text: data.message || "Profile updated successfully" });
-      if (role === "barber") {
-        showBarberNotice("success", data.message || "Profile updated successfully");
-      } else if (role === "admin") {
-        setAdminMessage(data.message || "Profile updated successfully");
-      }
-    } catch (error) {
-      setProfileNotice({ type: "error", text: error.message || "Could not connect to the server" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const selectSalon = async (salon) => {
     setSelectedSalon(salon);
-    setSalonDetailsOpen(true);
+    setSalonReviews([]);
+    setReviewsSalonId("");
     setSelectedServiceId("");
     setServices([]);
     setSlots([]);
@@ -1935,7 +1464,7 @@ function App() {
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setMessage(data.message || data.error || "Could not load services");
+        setMessage(data.message || "Could not load services");
         return;
       }
 
@@ -1944,9 +1473,26 @@ function App() {
         setMessage("No services added for this salon yet");
       }
     } catch (error) {
-      setMessage(error.message || "Could not connect to the server");
+      setMessage("Could not connect to the server");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSalonReviews = async (salonId) => {
+    try {
+      const res = await fetch(`${API_BASE}/salons/${salonId}/ratings`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setMessage(data.message || "Could not load reviews");
+        return;
+      }
+
+      setSalonReviews(data.ratings || []);
+      setReviewsSalonId(salonId);
+    } catch (error) {
+      setMessage("Could not connect to the server");
     }
   };
 
@@ -1982,7 +1528,8 @@ function App() {
     }
   };
 
-  const chooseService = async (serviceId) => {
+  const handleServiceChange = async (event) => {
+    const serviceId = event.target.value;
     setSelectedServiceId(serviceId);
     setSlots([]);
     setBookingError("");
@@ -2096,7 +1643,7 @@ function App() {
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
-      setShopMessage(data.message || data.error || "Could not load cosmetics orders");
+        setShopMessage(data.message || "Could not load product orders");
         return;
       }
 
@@ -2131,17 +1678,16 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setShopMessage(data.message || data.error || "Could not place cosmetics order");
+        setShopMessage(data.message || "Could not place product order");
         return;
       }
 
-        setShopMessage("Cosmetics order placed");
-        setProductOrderQuantities((current) => ({ ...current, [product._id]: 1 }));
-        setSelectedCosmetic(null);
-        await loadProducts();
+      setShopMessage("Product order placed");
+      setProductOrderQuantities((current) => ({ ...current, [product._id]: 1 }));
+      await loadProducts();
       await loadCustomerProductOrders();
     } catch (error) {
-      setShopMessage(error.message || "Could not connect to the server");
+      setShopMessage("Could not connect to the server");
     } finally {
       setLoading(false);
     }
@@ -2358,7 +1904,6 @@ function App() {
     setReservedSlots([]);
     setBoardPhotoFile(null);
     setBoardPhotoPreview("");
-    setBoardPhotoPosition(normalizeImagePosition(salon?.imagePosition));
     setBoardPhotoMessage("");
     setProductForm((current) => ({ ...current, salon_id: salonId || "" }));
 
@@ -2396,11 +1941,9 @@ function App() {
     setReservedSlots([]);
     setBoardPhotoFile(null);
     setBoardPhotoPreview("");
-    setBoardPhotoPosition(DEFAULT_IMAGE_POSITION);
     setBoardPhotoMessage("");
     setServiceForm({ name: "", service_category: "hair", price: "", duration: "30" });
-      setProductForm({ name: "", brand: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
-      setProductImagePosition(DEFAULT_IMAGE_POSITION);
+    setProductForm({ name: "", brand: "", description: "", price: "", stock_quantity: "", category: "", salon_id: "", active: true });
     setReserveForm({ date: today, start_time: "12:00", end_time: "12:30", reason: "" });
     setReserveMessage("");
     setWorkingHoursMessage("");
@@ -2422,7 +1965,6 @@ function App() {
     if (!file) {
       setProductImageFile(null);
       setProductImagePreview("");
-      setProductImagePosition(DEFAULT_IMAGE_POSITION);
       return;
     }
 
@@ -2430,7 +1972,6 @@ function App() {
     if (!allowedTypes.includes(file.type)) {
       setProductImageFile(null);
       setProductImagePreview("");
-      setProductImagePosition(DEFAULT_IMAGE_POSITION);
       setBarberProductMessage("Only jpg, jpeg, png, and webp images are allowed");
       return;
     }
@@ -2438,14 +1979,12 @@ function App() {
     if (file.size > 5 * 1024 * 1024) {
       setProductImageFile(null);
       setProductImagePreview("");
-      setProductImagePosition(DEFAULT_IMAGE_POSITION);
       setBarberProductMessage("Image must be 5MB or smaller");
       return;
     }
 
     setProductImageFile(file);
     setProductImagePreview(URL.createObjectURL(file));
-    setProductImagePosition(DEFAULT_IMAGE_POSITION);
   };
 
   const resetProductForm = () => {
@@ -2461,7 +2000,6 @@ function App() {
     });
     setProductImageFile(null);
     setProductImagePreview("");
-    setProductImagePosition(DEFAULT_IMAGE_POSITION);
     setEditingProductId("");
   };
 
@@ -2472,7 +2010,6 @@ function App() {
     if (!file) {
       setBoardPhotoFile(null);
       setBoardPhotoPreview("");
-      setBoardPhotoPosition(normalizeImagePosition(selectedBarberSalon?.imagePosition));
       return;
     }
 
@@ -2480,7 +2017,6 @@ function App() {
     if (!allowedTypes.includes(file.type)) {
       setBoardPhotoFile(null);
       setBoardPhotoPreview("");
-      setBoardPhotoPosition(normalizeImagePosition(selectedBarberSalon?.imagePosition));
       setBoardPhotoMessage("Only jpg, jpeg, png, and webp images are allowed");
       return;
     }
@@ -2488,14 +2024,12 @@ function App() {
     if (file.size > 5 * 1024 * 1024) {
       setBoardPhotoFile(null);
       setBoardPhotoPreview("");
-      setBoardPhotoPosition(normalizeImagePosition(selectedBarberSalon?.imagePosition));
       setBoardPhotoMessage("Image must be 5MB or smaller");
       return;
     }
 
     setBoardPhotoFile(file);
     setBoardPhotoPreview(URL.createObjectURL(file));
-    setBoardPhotoPosition(DEFAULT_IMAGE_POSITION);
   };
 
   const uploadBoardPhoto = async (event) => {
@@ -2506,7 +2040,7 @@ function App() {
       return;
     }
 
-    if (!boardPhotoFile && !selectedBarberSalon?.board_photo_url) {
+    if (!boardPhotoFile) {
       setBoardPhotoMessage("Please choose an image to upload");
       return;
     }
@@ -2516,10 +2050,7 @@ function App() {
 
     try {
       const formData = new FormData();
-      if (boardPhotoFile) {
-        formData.append("board_photo", boardPhotoFile);
-      }
-      formData.append("imagePosition", JSON.stringify(boardPhotoPosition));
+      formData.append("board_photo", boardPhotoFile);
 
       const res = await fetch(`${API_BASE}/salons/${selectedBarberSalonId}/board-photo`, {
         method: "PATCH",
@@ -2536,7 +2067,6 @@ function App() {
       setBoardPhotoMessage("Board photo updated");
       setBoardPhotoFile(null);
       setBoardPhotoPreview("");
-      setBoardPhotoPosition(normalizeImagePosition(data.salon?.imagePosition || boardPhotoPosition));
       await loadMySalons();
     } catch (error) {
       setBoardPhotoMessage("Could not connect to the server");
@@ -2758,7 +2288,7 @@ function App() {
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
-      setBarberProductMessage(data.message || data.error || "Could not load cosmetics");
+        setBarberProductMessage(data.message || "Could not load products");
         return;
       }
 
@@ -2770,16 +2300,13 @@ function App() {
 
   const loadBarberProductOrders = async () => {
     try {
-      const ordersUrl = selectedBarberSalonId
-        ? `${API_BASE}/product-orders/salon/${selectedBarberSalonId}`
-        : `${API_BASE}/product-orders/provider`;
-      const res = await fetch(ordersUrl, {
+      const res = await fetch(`${API_BASE}/product-orders/barber`, {
         headers: authHeaders()
       });
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setBarberProductMessage(data.message || data.error || "Could not load cosmetics orders");
+        setBarberProductMessage(data.message || "Could not load product orders");
         return;
       }
 
@@ -2809,7 +2336,6 @@ function App() {
       if (productImageFile) {
         formData.append("image", productImageFile);
       }
-      formData.append("imagePosition", JSON.stringify(productImagePosition));
 
       const res = await fetch(
         editingProductId ? `${API_BASE}/products/${editingProductId}` : `${API_BASE}/products`,
@@ -2822,7 +2348,7 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setBarberProductMessage(data.message || data.error || "Could not save cosmetic");
+        setBarberProductMessage(data.message || "Could not save product");
         return;
       }
 
@@ -2851,7 +2377,6 @@ function App() {
     });
     setProductImageFile(null);
     setProductImagePreview(product.image ? imageUrl(product.image) : "");
-    setProductImagePosition(normalizeImagePosition(product.imagePosition));
     setBarberProductMessage("");
   };
 
@@ -2860,8 +2385,8 @@ function App() {
       action: "deleteProduct",
       payload: product,
       title: `Deactivate ${product.name}?`,
-      body: "Customers will no longer be able to order this cosmetic.",
-      confirmLabel: "Yes, deactivate cosmetic"
+      body: "Customers will no longer be able to order this product.",
+      confirmLabel: "Yes, deactivate product"
     });
   };
 
@@ -2877,7 +2402,7 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setBarberProductMessage(data.message || data.error || "Could not deactivate cosmetic");
+        setBarberProductMessage(data.message || "Could not deactivate product");
         return;
       }
 
@@ -2916,7 +2441,7 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setBarberProductMessage(data.message || data.error || "Could not update cosmetics order");
+        setBarberProductMessage(data.message || "Could not update product order");
         return;
       }
 
@@ -2947,7 +2472,7 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setBarberProductMessage(data.message || data.error || "Could not update cosmetic");
+        setBarberProductMessage(data.message || "Could not update product");
         return;
       }
 
@@ -3431,7 +2956,7 @@ function App() {
     const data = await res.json().catch(() => []);
 
     if (!res.ok) {
-      setAdminMessage(data.message || data.error || "Could not load cosmetics");
+      setAdminMessage(data.message || "Could not load products");
       return;
     }
 
@@ -3443,7 +2968,7 @@ function App() {
     const data = await res.json().catch(() => []);
 
     if (!res.ok) {
-      setAdminMessage(data.message || data.error || "Could not load cosmetics orders");
+      setAdminMessage(data.message || "Could not load product orders");
       return;
     }
 
@@ -3570,11 +3095,11 @@ function App() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setAdminMessage(data.message || data.error || "Could not update cosmetic");
+        setAdminMessage(data.message || "Could not update product");
         return;
       }
 
-      setAdminMessage(active ? "Cosmetic reactivated" : "Cosmetic deactivated");
+      setAdminMessage(active ? "Product reactivated" : "Product deactivated");
       await loadAdminProducts();
       await loadProducts();
     } catch (error) {
@@ -3993,23 +3518,16 @@ function App() {
         <div style={styles.adminLayout}>
           <aside style={styles.sidebar}>
             {[
-              ["profile", "Profile"],
               ["settings", "Payment Rules"],
               ["earnings", "Earnings"],
               ["users", "Users"],
               ["salons", "Salons"],
-              ["products", "Cosmetics"],
+              ["products", "Products"],
               ["bookings", "Bookings"]
             ].map(([tab, label]) => (
               <button
                 key={tab}
-                onClick={() => {
-                  if (tab === "profile") {
-                    hydrateProfileForm();
-                    loadMyProfile();
-                  }
-                  setAdminTab(tab);
-                }}
+                onClick={() => setAdminTab(tab)}
                 style={{ ...styles.sidebarButton, ...(adminTab === tab ? styles.activeSidebarButton : {}) }}
               >
                 <Icon
@@ -4018,8 +3536,6 @@ function App() {
                       ? "payments"
                       : tab === "earnings"
                         ? "earnings"
-                        : tab === "profile"
-                          ? "users"
                         : tab === "salons"
                           ? "salons"
                           : tab === "products"
@@ -4123,25 +3639,6 @@ function App() {
                   </div>
                 </section>
               </div>
-            )}
-
-            {adminTab === "profile" && (
-              <>
-                <div style={styles.sectionHeader}>
-                  <h2 style={styles.sectionTitleWithIcon}><Icon name="users" /> Edit Profile</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      hydrateProfileForm();
-                      loadMyProfile();
-                    }}
-                    style={styles.smallButton}
-                  >
-                    Refresh
-                  </button>
-                </div>
-                {renderProfileEditor("Admin Profile")}
-              </>
             )}
 
             {adminTab === "settings" && (
@@ -4383,7 +3880,7 @@ function App() {
                         <img
                           src={imageUrl(salon.board_photo_url)}
                           alt=""
-                          style={getPositionedImageStyle(styles.salonPhoto, salon.imagePosition)}
+                          style={styles.salonPhoto}
                         />
                       ) : (
                         <div style={styles.salonPhotoPlaceholder}>No salon photo</div>
@@ -4456,23 +3953,19 @@ function App() {
             {adminTab === "products" && (
               <>
                 <div style={styles.sectionHeader}>
-                  <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Cosmetics Overview</h2>
+                  <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Products Overview</h2>
                   <button onClick={() => { loadAdminProducts(); loadAdminProductOrders(); }} style={styles.smallButton}>Refresh</button>
                 </div>
 
                 <div style={styles.list}>
                   {adminProducts.length === 0 ? (
-                    <p style={styles.message}>No cosmetics yet</p>
+                    <p style={styles.message}>No products yet</p>
                   ) : adminProducts.map((product) => (
                     <div key={product._id} style={styles.listItem}>
                       {product.image ? (
-                        <img
-                          src={imageUrl(product.image)}
-                          alt=""
-                          style={getPositionedImageStyle(styles.salonPhoto, product.imagePosition)}
-                        />
+                        <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
                       ) : (
-                        <div style={styles.salonPhotoPlaceholder}>Cosmetic image</div>
+                        <div style={styles.salonPhotoPlaceholder}>Product image</div>
                       )}
                       <strong>{product.name}</strong>
                       <span>{product.category || "General"}</span>
@@ -4495,14 +3988,14 @@ function App() {
                 </div>
 
                 <div style={styles.sectionHeader}>
-                  <h3 style={styles.compactTitle}>Cosmetics Orders</h3>
+                  <h3 style={styles.compactTitle}>Product Orders</h3>
                 </div>
                 <div style={styles.list}>
                   {adminProductOrders.length === 0 ? (
-                    <p style={styles.message}>No cosmetics orders yet</p>
+                    <p style={styles.message}>No product orders yet</p>
                   ) : adminProductOrders.map((order) => (
                     <div key={order._id} style={styles.listItem}>
-                      <strong>{order.product_id?.name || "Cosmetic"}</strong>
+                      <strong>{order.product_id?.name || "Product"}</strong>
                       <span>Customer: {order.customer_id?.name || order.customer_id?.phone || "Customer"}</span>
                       <span>Service Provider: {order.barber_id?.name || order.barber_id?.phone || "Service Provider"}</span>
                       <span>Salon: {order.salon_id?.name || "Not linked"}</span>
@@ -4679,42 +4172,20 @@ function App() {
 
             {barberMenuOpen && (
               <div style={styles.avatarMenu}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    hydrateProfileForm();
-                    loadMyProfile();
-                    setBarberMainTab("profile");
-                    setBarberMenuOpen(false);
-                  }}
-                  style={styles.menuItem}
-                >
-                  Profile
-                </button>
+                <button type="button" onClick={() => openBarberModal("profile")} style={styles.menuItem}>Profile</button>
                 <button type="button" onClick={() => openBarberModal("salons")} style={styles.menuItem}>Manage salons</button>
                 <button type="button" onClick={() => openBarberModal("service")} style={styles.menuItem}>Add service</button>
                 <button
                   type="button"
                   onClick={() => {
                     setBarberMenuOpen(false);
-                    resetProductForm();
                     setBarberMainTab("products");
                     loadBarberProducts();
-                  }}
-                  style={styles.menuItem}
-                >
-                  Cosmetics
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBarberMenuOpen(false);
-                    setBarberMainTab("productOrders");
                     loadBarberProductOrders();
                   }}
                   style={styles.menuItem}
                 >
-                  Cosmetics Orders
+                  Products
                 </button>
                 <button type="button" onClick={() => openBarberModal("hours")} style={styles.menuItem}>Working hours</button>
                 <button type="button" onClick={() => openBarberModal("reserve")} style={styles.menuItem}>Reserve time slot</button>
@@ -4790,58 +4261,16 @@ function App() {
           <button
             type="button"
             onClick={() => {
-              hydrateProfileForm();
-              loadMyProfile();
-              setBarberMainTab("profile");
-            }}
-            style={{ ...styles.tabButton, ...(barberMainTab === "profile" ? styles.activeTab : {}) }}
-          >
-            <Icon name="users" />
-            Profile
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              resetProductForm();
               setBarberMainTab("products");
               loadBarberProducts();
+              loadBarberProductOrders();
             }}
             style={{ ...styles.tabButton, ...(barberMainTab === "products" ? styles.activeTab : {}) }}
           >
             <Icon name="products" />
-            Cosmetics
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setBarberMainTab("productOrders");
-              loadBarberProductOrders();
-            }}
-            style={{ ...styles.tabButton, ...(barberMainTab === "productOrders" ? styles.activeTab : {}) }}
-          >
-            <Icon name="products" />
-            Cosmetics Orders
+            Products
           </button>
         </div>
-
-        {barberMainTab === "profile" && (
-        <section style={styles.panel}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="users" /> Edit Profile</h2>
-            <button
-              type="button"
-              onClick={() => {
-                hydrateProfileForm();
-                loadMyProfile();
-              }}
-              style={styles.smallButton}
-            >
-              Refresh
-            </button>
-          </div>
-          {renderProfileEditor(`Service Provider (${providerLabel})`)}
-        </section>
-        )}
 
         {barberMainTab === "dashboard" && (
         <section style={styles.panel}>
@@ -4975,7 +4404,7 @@ function App() {
           {barberSalons.length === 0 ? (
             <p style={styles.message}>No salons yet. Use the menu to create your first salon.</p>
           ) : (
-            <div className="salon-grid" style={styles.salonGrid}>
+            <div style={styles.salonList}>
               {barberSalons.map((salon) => {
                 const active = selectedBarberSalonId === salon._id;
 
@@ -4987,11 +4416,7 @@ function App() {
                     style={{ ...styles.salonCard, ...(active ? styles.activeSalonCard : {}) }}
                   >
                     {salon.board_photo_url ? (
-                      <img
-                        src={imageUrl(salon.board_photo_url)}
-                        alt=""
-                        style={getPositionedImageStyle(styles.compactProductImage, salon.imagePosition)}
-                      />
+                      <img src={imageUrl(salon.board_photo_url)} alt="" style={styles.salonPhoto} />
                     ) : (
                       <span style={styles.salonPhotoPlaceholder}>Salon board photo</span>
                     )}
@@ -5043,12 +4468,13 @@ function App() {
         {barberMainTab === "products" && (
         <section style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Cosmetics</h2>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Products</h2>
             <button
               type="button"
               onClick={() => {
                 resetProductForm();
                 loadBarberProducts();
+                loadBarberProductOrders();
               }}
               style={styles.smallButton}
             >
@@ -5063,8 +4489,8 @@ function App() {
           )}
 
           <form onSubmit={saveProduct} style={styles.uploadBox}>
-            <h3 style={styles.compactTitle}>{editingProductId ? "Edit cosmetic" : "Add cosmetic"}</h3>
-            <label style={styles.label}>Cosmetic name</label>
+            <h3 style={styles.compactTitle}>{editingProductId ? "Edit product" : "Add product"}</h3>
+            <label style={styles.label}>Product name</label>
             <input value={productForm.name} onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))} style={styles.input} />
             <label style={styles.label}>Brand</label>
             <input value={productForm.brand} onChange={(event) => setProductForm((current) => ({ ...current, brand: event.target.value }))} style={styles.input} />
@@ -5083,14 +4509,13 @@ function App() {
                 <option key={salon._id} value={salon._id}>{salon.name}</option>
               ))}
             </select>
-            <label style={styles.label}>Cosmetic image</label>
+            <label style={styles.label}>Product image</label>
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProductImageChange} style={styles.input} />
-            <ImagePositionEditor
-              imageSrc={productPreviewSource}
-              position={productImagePosition}
-              onChange={setProductImagePosition}
-              emptyLabel="Cosmetic image preview"
-            />
+            {productImagePreview ? (
+              <img src={productImagePreview} alt="" style={styles.boardPhotoPreview} />
+            ) : (
+              <div style={styles.boardPhotoPlaceholder}>Product image preview</div>
+            )}
             <label style={styles.checkboxLabel}>
               <input
                 type="checkbox"
@@ -5101,7 +4526,7 @@ function App() {
             </label>
             <div style={styles.buttonRow}>
               <button type="submit" disabled={loading} style={styles.primaryButton}>
-                {editingProductId ? "Update cosmetic" : "Add cosmetic"}
+                {editingProductId ? "Update product" : "Add product"}
               </button>
               {editingProductId && (
                 <button type="button" onClick={resetProductForm} style={styles.smallButton}>
@@ -5112,18 +4537,18 @@ function App() {
           </form>
 
           <div style={styles.sectionHeader}>
-            <h3 style={styles.compactTitle}>My cosmetics</h3>
+            <h3 style={styles.compactTitle}>My products</h3>
           </div>
           {barberProducts.length === 0 ? (
-            <p style={styles.message}>No cosmetics yet</p>
+            <p style={styles.message}>No products yet</p>
           ) : (
-            <div className="cosmetic-grid" style={styles.cosmeticGrid}>
+            <div style={styles.productGrid}>
               {barberProducts.map((product) => (
                 <div
                   key={product._id}
                   style={{
+                    ...styles.listItem,
                     ...styles.productCard,
-                    ...styles.compactCard,
                     ...(isProductUnavailable(product) ? styles.productCardUnavailable : {})
                   }}
                 >
@@ -5132,74 +4557,55 @@ function App() {
                       {productCategoryLabel(product.category)}
                     </span>
                     {product.image ? (
-                      <img
-                        src={imageUrl(product.image)}
-                        alt=""
-                        style={getPositionedImageStyle(styles.compactProductImage, product.imagePosition)}
-                      />
+                      <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
                     ) : (
-                      <div style={styles.salonPhotoPlaceholder}>Cosmetic image</div>
+                      <div style={styles.salonPhotoPlaceholder}>Product image</div>
                     )}
                     {isProductUnavailable(product) && (
                       <div style={styles.productOverlayLabel}>Out of Stock</div>
                     )}
                   </div>
-                  <div className="compact-card-body" style={styles.compactCardBody}>
-                    <strong>{product.name}</strong>
-                    <span style={styles.cardPrice}>Rs. {product.price}</span>
-                    <span style={Number(product.stock_quantity) <= 0 ? styles.outOfStockText : undefined}>
-                      {Number(product.stock_quantity) > 0 ? `Stock: ${product.stock_quantity}` : "Out of Stock"}
-                    </span>
-                    {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
-                      <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
-                    )}
-                    <span>{product.active === false ? "Inactive" : "Active"}</span>
-                    <div style={styles.buttonRow}>
-                      <button type="button" onClick={() => startEditProduct(product)} style={styles.smallButton}>Edit</button>
-                      <button
-                        type="button"
+                  <strong>{product.name}</strong>
+                  <span>Brand: {product.brand || "Unbranded"}</span>
+                  <span>Rs. {product.price}</span>
+                  <span style={Number(product.stock_quantity) <= 0 ? styles.outOfStockText : undefined}>
+                    {Number(product.stock_quantity) > 0 ? `Stock: ${product.stock_quantity}` : "Out of Stock"}
+                  </span>
+                  {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
+                    <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
+                  )}
+                  <span>Salon: {product.salon_id?.name || "Not linked to a salon"}</span>
+                  <span>{product.active === false ? "Inactive" : "Active"}</span>
+                  <div style={styles.buttonRow}>
+                    <button type="button" onClick={() => startEditProduct(product)} style={styles.smallButton}>Edit</button>
+                    <button
+                      type="button"
                       onClick={() => toggleProductActive(product, product.active === false)}
                       style={product.active === false ? styles.smallButton : styles.navButton}
-                      >
-                        {product.active === false ? "Activate" : "Deactivate"}
-                      </button>
-                      <button type="button" onClick={() => requestDeleteProduct(product)} style={styles.dangerButton}>Delete</button>
-                    </div>
+                    >
+                      {product.active === false ? "Activate" : "Deactivate"}
+                    </button>
+                    <button type="button" onClick={() => requestDeleteProduct(product)} style={styles.dangerButton}>Delete</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-        </section>
-        )}
-
-        {barberMainTab === "productOrders" && (
-        <section style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> Cosmetics Orders</h2>
-            <button
-              type="button"
-              onClick={loadBarberProductOrders}
-              style={styles.smallButton}
-            >
-              Refresh
-            </button>
+            <h3 style={styles.compactTitle}>Product orders</h3>
           </div>
           {barberProductOrders.length === 0 ? (
-            <p style={styles.message}>No cosmetics orders yet</p>
+            <p style={styles.message}>No product orders yet</p>
           ) : (
             <div style={styles.list}>
               {barberProductOrders.map((order) => (
                 <div key={order._id} style={styles.listItem}>
-                  <strong>{order.product_id?.name || "Cosmetic"}</strong>
+                  <strong>{order.product_id?.name || "Product"}</strong>
                   <span>Customer: {order.customer_id?.name || order.customer_id?.phone || "Customer"}</span>
-                  <span>Customer phone: {order.customer_id?.phone || "No phone available"}</span>
                   <span>Quantity: {order.quantity}</span>
-                  <span>Price: Rs. {order.unit_price ?? order.product_id?.price ?? 0}</span>
                   <span>Total: Rs. {order.total_amount}</span>
                   <span>Salon: {order.salon_id?.name || "Not linked"}</span>
-                  <span>Pickup info: {order.salon_id?.address || order.salon_id?.phone || "Collect from service provider"}</span>
                   <span>Created: {formatDateTime(order.createdAt)}</span>
                   <div style={styles.buttonRow}>
                     <StatusBadge status={order.status} />
@@ -5249,7 +4655,14 @@ function App() {
               )}
 
               {barberModal === "profile" && (
-                renderProfileEditor(`Service Provider (${providerLabel})`)
+                <div style={styles.listItem}>
+                  <strong>{currentUser?.name || "Service Provider"}</strong>
+                  <span style={{ ...styles.topSalonBadge, ...providerThemeStyles.badge }}>
+                    Service Provider ({providerLabel})
+                  </span>
+                  <span>{currentUser?.phone || "No phone saved"}</span>
+                  <span>Profile editing coming soon</span>
+                </div>
               )}
 
               {barberModal === "salons" && (
@@ -5467,15 +4880,14 @@ function App() {
 
               {barberModal === "photo" && selectedBarberSalonId && (
                 <form onSubmit={uploadBoardPhoto} style={styles.uploadBox}>
-                  <ImagePositionEditor
-                    imageSrc={boardPhotoSource}
-                    position={boardPhotoPosition}
-                    onChange={setBoardPhotoPosition}
-                    emptyLabel="No board photo uploaded"
-                  />
+                  {selectedBarberSalon?.board_photo_url || boardPhotoPreview ? (
+                    <img src={boardPhotoPreview || imageUrl(selectedBarberSalon?.board_photo_url)} alt="Salon board preview" style={styles.boardPhotoPreview} />
+                  ) : (
+                    <div style={styles.boardPhotoPlaceholder}>No board photo uploaded</div>
+                  )}
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleBoardPhotoChange} style={styles.input} />
                   {boardPhotoMessage && <p style={styles.message}>{boardPhotoMessage}</p>}
-                  <button type="submit" disabled={loading || (!boardPhotoFile && !selectedBarberSalon?.board_photo_url)} style={styles.primaryButton}>
+                  <button type="submit" disabled={loading || !boardPhotoFile} style={styles.primaryButton}>
                     Upload / update board photo
                   </button>
                 </form>
@@ -5614,7 +5026,7 @@ function App() {
                       <img
                         src={imageUrl(salon.board_photo_url)}
                         alt=""
-                        style={getPositionedImageStyle(styles.salonPhoto, salon.imagePosition)}
+                        style={styles.salonPhoto}
                       />
                     ) : (
                       <span style={styles.salonPhotoPlaceholder}>Salon board photo</span>
@@ -5697,12 +5109,15 @@ function App() {
             <>
               <form onSubmit={uploadBoardPhoto} style={styles.uploadBox}>
                 <h3 style={styles.compactTitle}>Salon Board Photo</h3>
-                <ImagePositionEditor
-                  imageSrc={boardPhotoSource}
-                  position={boardPhotoPosition}
-                  onChange={setBoardPhotoPosition}
-                  emptyLabel="No board photo uploaded"
-                />
+                {selectedBarberSalon?.board_photo_url || boardPhotoPreview ? (
+                  <img
+                    src={boardPhotoPreview || imageUrl(selectedBarberSalon?.board_photo_url)}
+                    alt="Salon board preview"
+                    style={styles.boardPhotoPreview}
+                  />
+                ) : (
+                  <div style={styles.boardPhotoPlaceholder}>No board photo uploaded</div>
+                )}
 
                 <input
                   type="file"
@@ -5711,7 +5126,7 @@ function App() {
                   style={styles.input}
                 />
                 {boardPhotoMessage && <p style={styles.message}>{boardPhotoMessage}</p>}
-                <button type="submit" disabled={loading || (!boardPhotoFile && !selectedBarberSalon?.board_photo_url)} style={styles.primaryButton}>
+                <button type="submit" disabled={loading || !boardPhotoFile} style={styles.primaryButton}>
                   Upload / update board photo
                 </button>
               </form>
@@ -6095,18 +5510,7 @@ function App() {
 
           {customerMenuOpen && (
             <div style={styles.avatarMenu}>
-              <button
-                type="button"
-                onClick={() => {
-                  hydrateProfileForm();
-                  loadMyProfile();
-                  setCustomerTab("profile");
-                  setCustomerMenuOpen(false);
-                }}
-                style={styles.menuItem}
-              >
-                Profile
-              </button>
+              <button type="button" onClick={() => setCustomerMenuOpen(false)} style={styles.menuItem}>Profile</button>
               <button
                 type="button"
                 onClick={() => {
@@ -6137,7 +5541,7 @@ function App() {
                 }}
                 style={styles.menuItem}
               >
-                Cosmetics Shop
+                Shop
               </button>
               <button
                 type="button"
@@ -6148,7 +5552,7 @@ function App() {
                 }}
                 style={styles.menuItem}
               >
-                My Cosmetics Orders
+                My Product Orders
               </button>
               <button type="button" onClick={logout} style={styles.menuItem}>Logout</button>
               <button
@@ -6197,25 +5601,13 @@ function App() {
         <button
           type="button"
           onClick={() => {
-            hydrateProfileForm();
-            loadMyProfile();
-            setCustomerTab("profile");
-          }}
-          style={{ ...styles.tabButton, ...(customerTab === "profile" ? styles.activeTab : {}) }}
-        >
-          <Icon name="users" />
-          Profile
-        </button>
-        <button
-          type="button"
-          onClick={() => {
             setCustomerTab("shop");
             loadProducts();
           }}
           style={{ ...styles.tabButton, ...(customerTab === "shop" ? styles.activeTab : {}) }}
         >
           <Icon name="shop" />
-          Cosmetics Shop
+          Shop
         </button>
         <button
           type="button"
@@ -6226,218 +5618,161 @@ function App() {
           style={{ ...styles.tabButton, ...(customerTab === "productOrders" ? styles.activeTab : {}) }}
         >
           <Icon name="products" />
-          My Cosmetics Orders
+          My Product Orders
         </button>
       </div>
 
-      {customerTab === "profile" && (
-        <section style={{ ...styles.panel, ...styles.dashboardSection }}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="users" /> Edit Profile</h2>
-            <button
-              type="button"
-              onClick={() => {
-                hydrateProfileForm();
-                loadMyProfile();
-              }}
-              style={styles.smallButton}
-            >
-              Refresh
-            </button>
-          </div>
-          {renderProfileEditor("Customer Profile")}
-        </section>
-      )}
-
       {customerTab === "book" && (
         <>
-      <section style={{ ...styles.panel, ...styles.dashboardSection }}>
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitleWithIcon}><Icon name="salons" /> Discover salons</h2>
-          {message && <div style={styles.errorCard}>{message}</div>}
+      <section style={styles.panel}>
+        <label style={styles.label} htmlFor="salon-search">Search salons</label>
+        <input
+          id="salon-search"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by salon name or location"
+          style={styles.input}
+        />
+        <label style={styles.label} htmlFor="salon-sort">Sort salons</label>
+        <select
+          id="salon-sort"
+          value={salonSort}
+          onChange={(event) => setSalonSort(event.target.value)}
+          style={styles.input}
+        >
+          <option value="top_rated">Top Rated</option>
+          <option value="most_reviewed">Most Reviewed</option>
+          <option value="newest">Newest</option>
+        </select>
+
+        <label style={styles.label} htmlFor="service-type-filter">Service Type</label>
+        <select
+          id="service-type-filter"
+          value={customerServiceTypeFilter}
+          onChange={(event) => setCustomerServiceTypeFilter(event.target.value)}
+          style={styles.input}
+        >
+          <option value="all">All</option>
+          <option value="hair">Hair</option>
+          <option value="beauty">Beauty</option>
+          <option value="makeup">Makeup</option>
+        </select>
+
+        <div style={styles.buttonRow}>
+          <button onClick={loadNearbySalons} style={styles.smallButton}>Nearby Salons</button>
+          {nearbyMode && <button onClick={loadSalons} style={styles.smallButton}>Show all salons</button>}
         </div>
 
-        <div style={styles.filterBar}>
-          <div>
-            <label style={styles.label} htmlFor="salon-search">Search salons</label>
-            <input
-              id="salon-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by salon name or location"
-              style={styles.input}
-            />
-          </div>
-          <div>
-            <label style={styles.label} htmlFor="service-type-filter">Service Type</label>
-            <select
-              id="service-type-filter"
-              value={customerServiceTypeFilter}
-              onChange={(event) => setCustomerServiceTypeFilter(event.target.value)}
-              style={styles.input}
-            >
-              <option value="all">All</option>
-              <option value="barber">Barber</option>
-              <option value="beautician">Beautician</option>
-              <option value="makeup_artist">Makeup Artist</option>
-            </select>
-          </div>
-          <div>
-            <label style={styles.label} htmlFor="salon-sort">Sort salons</label>
-            <select
-              id="salon-sort"
-              value={salonSort}
-              onChange={(event) => setSalonSort(event.target.value)}
-              style={styles.input}
-            >
-              <option value="top_rated">Highest Rated</option>
-              <option value="most_reviewed">Most Reviewed</option>
-              <option value="newest">Newest</option>
-              <option value="nearest">Nearest</option>
-            </select>
-          </div>
-          <div style={styles.filterActions}>
-            <button type="button" onClick={loadNearbySalons} style={styles.smallButton}>Nearby Salons</button>
-            <button type="button" onClick={clearSalonFilters} style={styles.smallButton}>Clear Filters</button>
-          </div>
-        </div>
+        <div style={styles.salonList}>
+          {!loading && filteredSalons.length === 0 && (
+            <p style={styles.message}>No salons found</p>
+          )}
 
-        {loading && salons.length === 0 ? (
-          <div className="salon-grid" style={styles.salonGrid}>
-            {[1, 2, 3].map((item) => (
-              <div key={item} style={{ ...styles.salonCard, ...styles.loadingCard }}>
-                <div style={styles.salonPhotoPlaceholder}>Loading salon</div>
-                <div style={styles.loadingLineWide} />
-                <div style={styles.loadingLine} />
-                <div style={styles.loadingLine} />
-                <div style={styles.loadingLineShort} />
-              </div>
-            ))}
-          </div>
-        ) : filteredSalons.length === 0 ? (
-          <div style={styles.emptyState}>
-            <Icon name="salons" />
-            <strong>No salons found</strong>
-            <span>Try changing your search or filters.</span>
-          </div>
-        ) : (
-          <div className="salon-grid" style={styles.salonGrid}>
-            {filteredSalons.map((salon) => {
-              const active = selectedSalon?._id === salon._id;
+          {filteredSalons.map((salon) => {
+            const active = selectedSalon?._id === salon._id;
 
-              return (
-                <button
-                  className="compact-card"
-                  key={salon._id}
-                  type="button"
-                  onClick={() => selectSalon(salon)}
+            return (
+              <button
+                key={salon._id}
+                onClick={() => selectSalon(salon)}
+                style={{
+                  ...styles.salonCard,
+                  ...(active ? styles.activeSalonCard : {})
+                }}
+              >
+                {salon.board_photo_url ? (
+                  <img
+                    src={imageUrl(salon.board_photo_url)}
+                    alt=""
+                    style={styles.salonPhoto}
+                  />
+                ) : (
+                  <span style={styles.salonPhotoPlaceholder}>Salon board photo</span>
+                )}
+                <strong style={styles.salonName}>{salon.name}</strong>
+                {isTopSalon(salon) && <span style={styles.topSalonBadge}>Top Salon</span>}
+                <span
                   style={{
-                    ...styles.salonCard,
-                    ...(active ? styles.activeSalonCard : {})
+                    ...styles.topSalonBadge,
+                    ...providerTheme(salon.professional_type || "barber").badge
                   }}
                 >
-                  <div style={styles.cardMediaWrap}>
-                    {salon.board_photo_url ? (
-                      <img
-                        src={imageUrl(salon.board_photo_url)}
-                        alt=""
-                        className="compact-card-image"
-                        style={getPositionedImageStyle(styles.salonPhotoLarge, salon.imagePosition)}
-                      />
-                    ) : (
-                      <span style={styles.salonPhotoPlaceholder}>Salon cover image</span>
-                    )}
-                    {salon.distance_km != null && (
-                      <span style={{ ...styles.badge, ...styles.distanceBadge }}>
-                        {formatDistance(salon.distance_km)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="compact-card-body" style={styles.compactCardBody}>
-                    <div style={styles.cardHeaderRow}>
-                      <strong style={styles.salonName}>{salon.name}</strong>
-                      <span style={styles.ratingBadge}>{Number(salon.average_rating || 0).toFixed(1)}</span>
-                    </div>
-                    <span className="distance-pill" style={styles.salonText}>
-                      {salon.distance_km != null ? formatDistance(salon.distance_km) : salon.address}
-                    </span>
-                    <span className="rating-stars" style={styles.ratingLine}>
-                      {renderStars(salon.average_rating)}
-                      {Number(salon.rating_count || 0) ? ` ${Number(salon.average_rating || 0).toFixed(1)}` : ""}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                  {professionalTypeLabel(salon.professional_type || "barber")}
+                </span>
+                <span style={styles.salonText}>{salon.address}</span>
+                <span style={styles.salonText}>{salon.phone}</span>
+                <span style={styles.ratingLine}>{"\u2B50"} {ratingText(salon)}</span>
+                <span style={styles.salonMeta}>{salon.services_count || 0} services</span>
+                {salon.distance_km !== undefined && (
+                  <span style={styles.salonMeta}>{salon.distance_km} km away</span>
+                )}
+                <span style={styles.bookNowPill}>Book now</span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {selectedSalon && (
-        <section style={{ ...styles.panel, ...styles.dashboardSection }}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="services" /> {selectedSalon.name} services</h2>
-            <button type="button" onClick={() => setSalonDetailsOpen(true)} style={styles.smallButton}>
-              View salon details
-            </button>
-          </div>
-
-          <div style={styles.filterBar}>
-            <div>
-              <label style={styles.label} htmlFor="booking-date">Date</label>
-              <input
-                id="booking-date"
-                type="date"
-                value={date}
-                onChange={handleDateChange}
-                style={styles.input}
-              />
-            </div>
-          </div>
-
-          <div style={styles.sectionHeader}>
-            <h3 style={styles.compactTitle}>Services</h3>
-          </div>
-          {filteredServices.length === 0 ? (
-            <div style={styles.emptyState}>
-              <Icon name="services" />
-              <strong>No services found</strong>
-              <span>Try changing your search or filters.</span>
-            </div>
+        <section style={styles.panel}>
+          {selectedSalon.board_photo_url ? (
+            <img
+              src={imageUrl(selectedSalon.board_photo_url)}
+              alt={`${selectedSalon.name} salon board`}
+              style={styles.boardPhotoPreview}
+            />
           ) : (
-            <div style={styles.gridList}>
-              {filteredServices.map((service) => {
-                const serviceFee = Number(
-                  (Number(service.price || 0) * Number(paymentRules.booking_fee_percentage || 0) / 100).toFixed(2)
-                );
-                const activeService = selectedServiceId === service._id;
-
-                return (
-                  <button
-                    key={service._id}
-                    type="button"
-                    onClick={() => chooseService(service._id)}
-                    style={{
-                      ...styles.serviceCard,
-                      ...(activeService ? styles.activeSalonCard : {})
-                    }}
-                  >
-                    <div style={styles.cardHeaderRow}>
-                      <strong>{service.name}</strong>
-                      <span style={{ ...styles.badge, ...productCategoryStyle(service.service_category || "hair") }}>
-                        {serviceCategoryLabel(service.service_category || "hair")}
-                      </span>
-                    </div>
-                    <span style={styles.salonText}>{service.duration} min</span>
-                    <span style={styles.salonText}>Price: Rs. {service.price}</span>
-                    <span style={styles.salonText}>Advance: Rs. {serviceFee}</span>
-                    <span style={styles.bookNowPill}>Book</span>
-                  </button>
-                );
-              })}
-            </div>
+            <div style={styles.boardPhotoPlaceholder}>No salon board photo yet</div>
           )}
+          <h2 style={styles.sectionTitle}>{selectedSalon.name}</h2>
+          <div style={styles.reviewBox}>
+            <strong>{"\u2B50"} {ratingText(selectedSalon)}</strong>
+            {isTopSalon(selectedSalon) && <span style={styles.topSalonBadge}>Top Salon</span>}
+            {selectedSalon.highest_rated_review?.comment && (
+              <span>Highest rated: "{selectedSalon.highest_rated_review.comment}"</span>
+            )}
+            {selectedSalon.recent_reviews?.[0]?.comment && (
+              <span>Most recent: "{selectedSalon.recent_reviews[0].comment}"</span>
+            )}
+            {(selectedSalon.recent_reviews || []).slice(0, 5).map((review) => (
+              <span key={review._id}>
+                {review.rating}/5 - {review.comment}
+              </span>
+            ))}
+            {(selectedSalon.rating_count || 0) > 5 && (
+              <button type="button" onClick={() => loadSalonReviews(selectedSalon._id)} style={styles.linkButton}>View all reviews</button>
+            )}
+            {reviewsSalonId === selectedSalon._id && salonReviews.slice(0, 20).map((review) => (
+              <span key={review._id}>
+                {review.rating}/5 - {review.comment || "No comment"}
+              </span>
+            ))}
+          </div>
+
+          <label style={styles.label} htmlFor="booking-date">Date</label>
+          <input
+            id="booking-date"
+            type="date"
+            value={date}
+            onChange={handleDateChange}
+            style={styles.input}
+          />
+
+          <label style={styles.label} htmlFor="service-select">Service</label>
+          <select
+            id="service-select"
+            value={selectedServiceId}
+            onChange={handleServiceChange}
+            style={styles.input}
+          >
+            <option value="">Choose a service</option>
+            {filteredServices.map((service) => (
+              <option key={service._id} value={service._id}>
+                {service.name} - {serviceCategoryLabel(service.service_category || "hair")} - Rs. {service.price} ({service.duration} min)
+              </option>
+            ))}
+          </select>
 
           {selectedServicePayment && (
             <div style={styles.successCard}>
@@ -6525,87 +5860,6 @@ function App() {
       )}
         </>
       )}
-
-      <DetailsModal
-        open={salonDetailsOpen && Boolean(selectedSalon)}
-        title={selectedSalon?.name || "Salon details"}
-        onClose={() => setSalonDetailsOpen(false)}
-        wide
-      >
-        {selectedSalon && (
-          <div style={styles.modalDetailsStack}>
-            {selectedSalon.board_photo_url ? (
-              <img
-                src={imageUrl(selectedSalon.board_photo_url)}
-                alt={`${selectedSalon.name} salon board`}
-                style={getPositionedImageStyle(styles.modalHeroImage, selectedSalon.imagePosition)}
-              />
-            ) : (
-              <div style={styles.boardPhotoPlaceholder}>No salon board photo yet</div>
-            )}
-            <div style={styles.reviewBox}>
-              <strong>{"\u2B50"} {ratingText(selectedSalon)}</strong>
-              <span>{selectedSalon.address}</span>
-              <span>{selectedSalon.phone}</span>
-              <span>{renderStars(selectedSalon.average_rating)}</span>
-              <div style={styles.cardMetaRow}>
-                <span style={styles.salonMeta}>Services: {selectedSalon.services_count || 0}</span>
-                <span style={styles.salonMeta}>Bookings today: {selectedSalon.bookingsCount ?? 0}</span>
-                <span style={styles.salonMeta}>
-                  {String(selectedSalon.approval_status || "approved").replace("_", " ")}
-                </span>
-              </div>
-              {selectedSalon.highest_rated_review?.comment && (
-                <span>Highest rated: "{selectedSalon.highest_rated_review.comment}"</span>
-              )}
-              {selectedSalon.recent_reviews?.[0]?.comment && (
-                <span>Most recent: "{selectedSalon.recent_reviews[0].comment}"</span>
-              )}
-            </div>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.compactTitle}>Available services</h3>
-            </div>
-            {filteredServices.length === 0 ? (
-              <div style={styles.emptyState}>
-                <Icon name="services" />
-                <strong>No services found</strong>
-                <span>Try changing your search or filters.</span>
-              </div>
-            ) : (
-              <div className="grid-list" style={styles.serviceGrid}>
-                {filteredServices.map((service) => {
-                  const serviceFee = Number(
-                    (Number(service.price || 0) * Number(paymentRules.booking_fee_percentage || 0) / 100).toFixed(2)
-                  );
-                  return (
-                    <div key={service._id} className="service-card" style={styles.serviceCard}>
-                      <div style={styles.cardHeaderRow}>
-                        <strong>{service.name}</strong>
-                        <span style={{ ...styles.badge, ...productCategoryStyle(service.service_category || "hair") }}>
-                          {serviceCategoryLabel(service.service_category || "hair")}
-                        </span>
-                      </div>
-                      <span style={styles.salonText}>{service.duration} min</span>
-                      <span style={styles.salonText}>Price: Rs. {service.price}</span>
-                      <span style={styles.salonText}>Advance: Rs. {serviceFee}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          chooseService(service._id);
-                          setSalonDetailsOpen(false);
-                        }}
-                        style={styles.primaryButton}
-                      >
-                        Book / View Services
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </DetailsModal>
 
       {customerTab === "appointments" && (
         <section style={styles.panel}>
@@ -6715,34 +5969,21 @@ function App() {
       )}
 
       {customerTab === "shop" && (
-        <section style={{ ...styles.panel, ...styles.dashboardSection }}>
+        <section style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="shop" /> Cosmetics Shop</h2>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="shop" /> Shop</h2>
             <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Refresh</button>
           </div>
-          {shopMessage && <div style={styles.errorCard}>{shopMessage}</div>}
-          <div style={styles.filterBar}>
+          {shopMessage && <p style={styles.message}>{shopMessage}</p>}
+          <div style={styles.filterGrid}>
             <div>
-              <label style={styles.label}>Search cosmetics</label>
+              <label style={styles.label}>Search products</label>
               <input
                 value={productSearch}
                 onChange={(event) => setProductSearch(event.target.value)}
-                placeholder="Search by cosmetic name, brand, or category"
+                placeholder="Search by name, brand, or category"
                 style={styles.input}
               />
-            </div>
-            <div>
-              <label style={styles.label}>Brand</label>
-              <select
-                value={productBrandFilter}
-                onChange={(event) => setProductBrandFilter(event.target.value)}
-                style={styles.input}
-              >
-                <option value="">All brands</option>
-                {productBrandOptions.map((brand) => (
-                  <option key={brand} value={brand}>{brand}</option>
-                ))}
-              </select>
             </div>
             <div>
               <label style={styles.label}>Salon</label>
@@ -6764,58 +6005,27 @@ function App() {
                 onChange={(event) => setProductListingMode(event.target.value)}
                 style={styles.input}
               >
-                <option value="salon">Cosmetics by salon</option>
-                <option value="nearby">Nearby cosmetics</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Sort</label>
-              <select
-                value={productSort}
-                onChange={(event) => setProductSort(event.target.value)}
-                style={styles.input}
-              >
-                <option value="distance">Distance</option>
-                <option value="price_low">Price low to high</option>
-                <option value="price_high">Price high to low</option>
+                <option value="salon">Products by selected salon</option>
+                <option value="nearby">Nearby products by distance</option>
               </select>
             </div>
           </div>
-          <div style={styles.filterActions}>
+          <div style={styles.buttonRow}>
             <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Apply filters</button>
             {productListingMode === "nearby" && (
               <button type="button" onClick={applyProductFilters} style={styles.smallButton}>Use my location</button>
             )}
-            <button type="button" onClick={clearProductFilters} style={styles.smallButton}>Clear Filters</button>
           </div>
-          {loading && customerProducts.length === 0 ? (
-            <div style={styles.gridList}>
-              {[1, 2, 3].map((item) => (
-                <div key={item} style={{ ...styles.productCard, ...styles.loadingCard }}>
-                  <div style={styles.salonPhotoPlaceholder}>Loading cosmetic</div>
-                  <div style={styles.loadingLineWide} />
-                  <div style={styles.loadingLine} />
-                  <div style={styles.loadingLine} />
-                </div>
-              ))}
-            </div>
-          ) : filteredCustomerProducts.length === 0 ? (
-            <div style={styles.emptyState}>
-              <Icon name="shop" />
-              <strong>No cosmetics found</strong>
-              <span>Try changing your search or filters.</span>
-            </div>
+          {customerProducts.length === 0 ? (
+            <p style={styles.message}>No products available right now</p>
           ) : (
-            <div className="cosmetic-grid" style={styles.cosmeticGrid}>
-              {filteredCustomerProducts.map((product) => (
-                <button
-                  type="button"
+            <div style={styles.productGrid}>
+              {customerProducts.map((product) => (
+                <div
                   key={product._id}
-                  className="compact-card"
-                  onClick={() => setSelectedCosmetic(product)}
                   style={{
+                    ...styles.listItem,
                     ...styles.productCard,
-                    ...styles.compactCard,
                     ...(isProductUnavailable(product) ? styles.productCardUnavailable : {})
                   }}
                 >
@@ -6824,115 +6034,76 @@ function App() {
                       {productCategoryLabel(product.category)}
                     </span>
                     {product.image ? (
-                      <img
-                        src={imageUrl(product.image)}
-                        alt=""
-                        className="compact-card-image"
-                        style={getPositionedImageStyle(styles.compactProductImage, product.imagePosition)}
-                      />
+                      <img src={imageUrl(product.image)} alt="" style={styles.salonPhoto} />
                     ) : (
-                      <div style={styles.salonPhotoPlaceholder}>Cosmetic image</div>
+                      <div style={styles.salonPhotoPlaceholder}>Product image</div>
                     )}
                     {isProductUnavailable(product) && (
                       <div style={styles.productOverlayLabel}>Out of Stock</div>
                     )}
                   </div>
-                  <div className="compact-card-body" style={styles.compactCardBody}>
-                    <strong>{product.name}</strong>
-                    <span style={styles.cardPrice}>Rs. {product.price}</span>
-                    {product.distance_km != null && (
-                      <span className="distance-pill" style={{ ...styles.badge, background: "#eef4ff", color: "#1d4ed8" }}>
-                        {formatDistance(product.distance_km)}
-                      </span>
-                    )}
+                  <strong>{product.name}</strong>
+                  <span>Brand: {product.brand || "Unbranded"}</span>
+                  <span>{product.description || "Product"}</span>
+                  <span>Rs. {product.price}</span>
+                  <span style={Number(product.stock_quantity) <= 0 ? styles.outOfStockText : undefined}>
+                    {Number(product.stock_quantity) > 0 ? `Stock: ${product.stock_quantity}` : "Out of Stock"}
+                  </span>
+                  {Number(product.stock_quantity) > 0 && Number(product.stock_quantity) <= 5 && (
+                    <span style={styles.lowStockText}>Only {product.stock_quantity} left</span>
+                  )}
+                  <span>Service Provider: {product.barber_id?.name || product.barber_id?.phone || "Service Provider"}</span>
+                  <span>Salon: {product.salon_id?.name || "Pickup details from service provider"}</span>
+                  {product.distance_km != null && (
+                    <span>{product.distance_km} km away</span>
+                  )}
+                  <div style={styles.filterGrid}>
+                    <div>
+                      <label style={styles.label}>Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={product.stock_quantity || 1}
+                        value={productOrderQuantities[product._id] || 1}
+                        onChange={(event) => setProductOrderQuantities((current) => ({
+                          ...current,
+                          [product._id]: event.target.value
+                        }))}
+                        style={styles.input}
+                      />
+                    </div>
                   </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => placeProductOrder(product)}
+                    disabled={loading || isProductUnavailable(product)}
+                    style={styles.primaryButton}
+                  >
+                    {isProductUnavailable(product) ? "Unavailable" : "Order for pickup"}
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </section>
       )}
 
-      <DetailsModal
-        open={Boolean(selectedCosmetic)}
-        title={selectedCosmetic?.name || "Cosmetic details"}
-        onClose={() => setSelectedCosmetic(null)}
-      >
-        {selectedCosmetic && (
-          <div style={styles.modalDetailsStack}>
-            <div style={styles.productMediaWrap}>
-              <span style={{ ...styles.productBadge, ...productCategoryStyle(selectedCosmetic.category) }}>
-                {productCategoryLabel(selectedCosmetic.category)}
-              </span>
-              {selectedCosmetic.image ? (
-                <img
-                  src={imageUrl(selectedCosmetic.image)}
-                  alt=""
-                  style={getPositionedImageStyle(styles.modalHeroImage, selectedCosmetic.imagePosition)}
-                />
-              ) : (
-                <div style={styles.salonPhotoPlaceholder}>Cosmetic image</div>
-              )}
-              {isProductUnavailable(selectedCosmetic) && (
-                <div style={styles.productOverlayLabel}>Out of Stock</div>
-              )}
-            </div>
-            <div style={styles.list}>
-              <strong style={styles.compactTitle}>{selectedCosmetic.name}</strong>
-              <span style={styles.cardPrice}>Rs. {selectedCosmetic.price}</span>
-              <span>Brand: {selectedCosmetic.brand || "Unbranded"}</span>
-              <span>Salon: {selectedCosmetic.salon_id?.name || "Salon pickup"}</span>
-              <span>
-                Stock: {Number(selectedCosmetic.stock_quantity) > 0 ? selectedCosmetic.stock_quantity : "Out of Stock"}
-              </span>
-              {selectedCosmetic.distance_km != null && (
-                <span>{formatDistance(selectedCosmetic.distance_km)}</span>
-              )}
-              <span>{selectedCosmetic.description || "Cosmetic"}</span>
-              <div>
-                <label style={styles.label}>Quantity</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedCosmetic.stock_quantity || 1}
-                  value={productOrderQuantities[selectedCosmetic._id] || 1}
-                  onChange={(event) => setProductOrderQuantities((current) => ({
-                    ...current,
-                    [selectedCosmetic._id]: event.target.value
-                  }))}
-                  style={styles.input}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => placeProductOrder(selectedCosmetic)}
-                disabled={loading || isProductUnavailable(selectedCosmetic)}
-                style={styles.primaryButton}
-              >
-                {isProductUnavailable(selectedCosmetic) ? "Unavailable" : "Order cosmetic for pickup"}
-              </button>
-            </div>
-          </div>
-        )}
-      </DetailsModal>
-
       {customerTab === "productOrders" && (
         <section style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> My Cosmetics Orders</h2>
+            <h2 style={styles.sectionTitleWithIcon}><Icon name="products" /> My Product Orders</h2>
             <button type="button" onClick={loadCustomerProductOrders} style={styles.smallButton}>Refresh</button>
           </div>
           {shopMessage && <p style={styles.message}>{shopMessage}</p>}
           {customerProductOrders.length === 0 ? (
-            <p style={styles.message}>No cosmetics orders yet</p>
+            <p style={styles.message}>No product orders yet</p>
           ) : (
             <div style={styles.list}>
               {customerProductOrders.map((order) => (
                 <div key={order._id} style={styles.listItem}>
-                  <strong>{order.product_id?.name || "Cosmetic"}</strong>
+                  <strong>{order.product_id?.name || "Product"}</strong>
                   <span>Service Provider: {order.barber_id?.name || order.barber_id?.phone || "Service Provider"}</span>
                   <span>Salon: {order.salon_id?.name || "Not linked to a salon"}</span>
-                  <span>Pickup info: {order.salon_id?.address || order.salon_id?.phone || "Collect from service provider"}</span>
                   <span>Quantity: {order.quantity}</span>
                   <span>Total: Rs. {order.total_amount}</span>
                   <span>Created: {formatDateTime(order.createdAt)}</span>
@@ -7371,9 +6542,6 @@ const styles = {
     background: "#ffffff",
     boxShadow: "0 18px 42px rgba(23, 32, 38, 0.22)"
   },
-  wideModalCard: {
-    maxWidth: 880
-  },
   activeTab: {
     borderColor: "#0f766e",
     background: "#eefaf8",
@@ -7426,106 +6594,30 @@ const styles = {
   },
   salonList: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 14,
-    marginTop: 12
-  },
-  salonGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 14,
+    gap: 10,
     marginTop: 12
   },
   productGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 14,
-    marginTop: 12
-  },
-  cosmeticGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 14,
-    marginTop: 12
-  },
-  dashboardSection: {
-    display: "grid",
-    gap: 16,
-    borderRadius: 14,
-    padding: 18,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(245,250,251,0.96))",
-    boxShadow: "0 18px 40px rgba(15, 63, 58, 0.08)"
-  },
-  filterBar: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 12,
-    alignItems: "end",
-    padding: 14,
-    border: "1px solid #dbe7ea",
-    borderRadius: 12,
-    background: "#f8fbfc"
-  },
-  filterActions: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(140px, 1fr))",
-    gap: 10,
-    alignSelf: "end"
-  },
-  gridList: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: 14
-  },
-  serviceGrid: {
-    display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14
+    gap: 12,
+    marginTop: 12
   },
   salonCard: {
-    position: "relative",
     display: "grid",
-    alignContent: "start",
-    gap: 10,
+    gap: 4,
     width: "100%",
     minWidth: 0,
-    padding: 0,
+    padding: 14,
     textAlign: "left",
     border: "1px solid #d9e1e8",
-    borderRadius: 18,
-    background: "#ffffff",
-    cursor: "pointer",
-    overflow: "hidden",
-    boxShadow: "0 16px 32px rgba(15, 63, 58, 0.08)",
-    transition: "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease"
+    borderRadius: 8,
+    background: "#f9fbfc",
+    cursor: "pointer"
   },
   activeSalonCard: {
     borderColor: "#0f766e",
-    background: "#f4fcfa",
-    boxShadow: "0 20px 38px rgba(15, 118, 110, 0.16)"
-  },
-  cardMediaWrap: {
-    position: "relative",
-    minHeight: 190,
-    background: "#dfe9ec"
-  },
-  compactCard: {
-    padding: 0,
-    textAlign: "left",
-    overflow: "hidden",
-    cursor: "pointer"
-  },
-  compactCardBody: {
-    display: "grid",
-    gap: 8,
-    padding: "12px 14px 14px"
-  },
-  salonPhotoLarge: {
-    width: "100%",
-    height: 190,
-    objectFit: "cover",
-    display: "block",
-    background: "#dfe9ec"
+    background: "#eefaf8"
   },
   salonPhoto: {
     width: "100%",
@@ -7535,18 +6627,14 @@ const styles = {
     marginBottom: 6,
     background: "#e8eef2"
   },
-  compactProductImage: {
-    width: "100%",
-    height: 190,
-    display: "block",
-    background: "#dfe9ec"
-  },
   salonPhotoPlaceholder: {
     display: "grid",
     placeItems: "center",
     width: "100%",
-    height: 190,
-    background: "linear-gradient(135deg, #d7e6ea, #edf5f7)",
+    height: 130,
+    borderRadius: 6,
+    marginBottom: 6,
+    background: "#e8eef2",
     color: "#52606d",
     fontWeight: 700
   },
@@ -7558,37 +6646,6 @@ const styles = {
     border: "1px solid #d9e1e8",
     borderRadius: 8,
     background: "#f9fbfc"
-  },
-  imagePositionEditor: {
-    display: "grid",
-    gap: 10
-  },
-  imageEditorFrame: {
-    position: "relative",
-    minHeight: 240,
-    overflow: "hidden",
-    borderRadius: 10,
-    border: "1px solid #d9e1e8",
-    background: "#eef4f6",
-    touchAction: "none",
-    cursor: "grab"
-  },
-  imageEditorImg: {
-    width: "100%",
-    height: 240,
-    display: "block",
-    userSelect: "none"
-  },
-  positionControls: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 12,
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  rangeInput: {
-    width: "100%",
-    marginTop: 8
   },
   compactTitle: {
     margin: 0,
@@ -7612,18 +6669,6 @@ const styles = {
     color: "#52606d",
     fontWeight: 700
   },
-  modalDetailsStack: {
-    display: "grid",
-    gap: 14
-  },
-  modalHeroImage: {
-    width: "100%",
-    height: 280,
-    display: "block",
-    borderRadius: 10,
-    border: "1px solid #d9e1e8",
-    background: "#e8eef2"
-  },
   profilePhotoPreview: {
     width: 120,
     height: 120,
@@ -7631,17 +6676,6 @@ const styles = {
     borderRadius: "50%",
     border: "1px solid #d9e1e8",
     background: "#e8eef2"
-  },
-  profileHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    flexWrap: "wrap"
-  },
-  profileHeaderText: {
-    display: "grid",
-    gap: 4,
-    color: "#52606d"
   },
   profilePhotoPlaceholder: {
     display: "grid",
@@ -7663,20 +6697,16 @@ const styles = {
     border: "1px solid #d9e1e8"
   },
   salonName: {
-    fontSize: 19,
-    lineHeight: 1.3
+    fontSize: 17
   },
   salonText: {
     color: "#52606d",
     lineHeight: 1.35
   },
   salonMeta: {
-    color: "#0f3f3a",
+    color: "#0f766e",
     fontWeight: 700,
-    padding: "8px 10px",
-    borderRadius: 10,
-    background: "#eefaf8",
-    border: "1px solid #d8efea"
+    marginTop: 4
   },
   topSalonBadge: {
     justifySelf: "start",
@@ -7698,62 +6728,7 @@ const styles = {
     gap: 5,
     color: "#8a5a00",
     fontWeight: 800,
-    flexWrap: "wrap"
-  },
-  ratingBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 50,
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#0f766e",
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: 800,
-    boxShadow: "0 8px 18px rgba(15, 118, 110, 0.18)"
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "fit-content",
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#eefaf8",
-    color: "#0f766e",
-    fontSize: 12,
-    fontWeight: 800
-  },
-  distanceBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    zIndex: 2,
-    background: "rgba(15, 23, 42, 0.82)",
-    color: "#ffffff",
-    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.22)"
-  },
-  cardHeaderRow: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10
-  },
-  cardMetaRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  cardStatGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-    gap: 8
-  },
-  cardContentStack: {
-    display: "grid",
-    gap: 8,
-    padding: "0 16px 16px"
+    marginTop: 4
   },
   reviewBox: {
     display: "grid",
@@ -7766,16 +6741,13 @@ const styles = {
     color: "#3b2f17"
   },
   bookNowPill: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 40,
-    padding: "9px 12px",
+    justifySelf: "start",
+    marginTop: 8,
+    padding: "7px 10px",
     borderRadius: 999,
     background: "#0f766e",
     color: "#ffffff",
-    fontWeight: 800,
-    flex: 1
+    fontWeight: 800
   },
   sectionTitle: {
     margin: "0 0 8px",
@@ -7847,21 +6819,14 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     alignContent: "start",
-    minHeight: "100%",
-    border: "1px solid #d9e1e8",
-    borderRadius: 18,
-    background: "#ffffff",
-    padding: 0,
-    boxShadow: "0 16px 32px rgba(15, 63, 58, 0.08)"
+    minHeight: "100%"
   },
   productCardUnavailable: {
     opacity: 0.62,
     filter: "grayscale(0.25)"
   },
   productMediaWrap: {
-    position: "relative",
-    minHeight: 190,
-    background: "#dfe9ec"
+    position: "relative"
   },
   productBadge: {
     position: "absolute",
@@ -7899,11 +6864,6 @@ const styles = {
     color: "#ffffff",
     fontWeight: 800,
     letterSpacing: 0.2
-  },
-  cardPrice: {
-    color: "#0f3f3a",
-    fontWeight: 800,
-    fontSize: 18
   },
   lowStockText: {
     color: "#c2410c",
@@ -7954,53 +6914,6 @@ const styles = {
     gap: 10,
     alignItems: "end",
     marginTop: 12
-  },
-  serviceCard: {
-    display: "grid",
-    gap: 10,
-    alignContent: "start",
-    width: "100%",
-    minWidth: 0,
-    padding: 16,
-    border: "1px solid #d9e1e8",
-    borderRadius: 16,
-    background: "#ffffff",
-    textAlign: "left",
-    boxShadow: "0 12px 26px rgba(15, 63, 58, 0.06)",
-    cursor: "pointer"
-  },
-  emptyState: {
-    display: "grid",
-    justifyItems: "center",
-    gap: 10,
-    padding: 28,
-    border: "1px dashed #cdd9de",
-    borderRadius: 16,
-    background: "#f8fbfc",
-    color: "#52606d",
-    textAlign: "center"
-  },
-  loadingCard: {
-    pointerEvents: "none"
-  },
-  loadingLineWide: {
-    height: 16,
-    margin: "0 16px",
-    borderRadius: 999,
-    background: "linear-gradient(90deg, #edf2f5, #dfe8ec, #edf2f5)"
-  },
-  loadingLine: {
-    height: 12,
-    margin: "0 16px",
-    borderRadius: 999,
-    background: "linear-gradient(90deg, #edf2f5, #dfe8ec, #edf2f5)"
-  },
-  loadingLineShort: {
-    width: "45%",
-    height: 12,
-    margin: "0 16px 16px",
-    borderRadius: 999,
-    background: "linear-gradient(90deg, #edf2f5, #dfe8ec, #edf2f5)"
   },
   adminBookingFilters: {
     display: "grid",

@@ -32,8 +32,113 @@ button {
   min-height: 44px;
 }
 
+.dashboard-section {
+  display: grid;
+  gap: 16px;
+}
+
+.filter-bar {
+  display: grid;
+  gap: 12px;
+}
+
+.grid-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.salon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.cosmetic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.compact-card {
+  width: 100%;
+}
+
+.compact-card-image {
+  width: 100%;
+  display: block;
+}
+
+.compact-card-body {
+  display: grid;
+  gap: 8px;
+}
+
+.badge,
+.rating-badge,
+.distance-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rating-stars {
+  letter-spacing: 0;
+}
+
+.empty-state {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.loading-card {
+  opacity: 0.9;
+}
+
+.image-position-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.image-editor-frame {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.image-editor-img {
+  user-select: none;
+}
+
+.position-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.details-modal-backdrop {
+  backdrop-filter: blur(2px);
+}
+
+.details-modal {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.details-modal-close {
+  align-self: start;
+}
+
 @media (max-width: 720px) {
   body {
     background: #f6fbfa;
+  }
+
+  .salon-grid,
+  .cosmetic-grid,
+  .grid-list {
+    grid-template-columns: 1fr;
   }
 }
